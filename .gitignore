@@ -1,0 +1,6 @@
+build/_output/onos-mho
+
+# Jenkins stuff
+*report*.xml
+*coverage*.xml
+*-output.out
