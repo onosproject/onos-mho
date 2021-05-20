@@ -6,7 +6,7 @@ package controller
 
 import (
 	e2tapi "github.com/onosproject/onos-api/go/onos/e2t/e2"
-	e2smrcpreies "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_rc_pre/v1/e2sm-rc-pre-ies"
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-mho/pkg/store"
 	"google.golang.org/protobuf/proto"
@@ -42,13 +42,13 @@ func (c *MhoCtrl) listenIndChan() {
 		indHeaderByte := indMsg.IndMsg.Payload.Header
 		indMessageByte := indMsg.IndMsg.Payload.Message
 
-		indHeader := e2smrcpreies.E2SmRcPreIndicationHeader{}
+		indHeader := e2sm_mho.E2SmMhoIndicationHeader{}
 		err = proto.Unmarshal(indHeaderByte, &indHeader)
 		if err != nil {
 			logPci.Errorf("Error - Unmarshalling header protobytes to struct: %v", err)
 		}
 
-		indMessage := e2smrcpreies.E2SmRcPreIndicationMessage{}
+		indMessage := e2sm_mho.E2SmMhoIndicationMessage{}
 		err = proto.Unmarshal(indMessageByte, &indMessage)
 		if err != nil {
 			logPci.Errorf("Error - Unmarshalling message protobytes to struct: %v", err)

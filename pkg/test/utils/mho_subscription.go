@@ -8,7 +8,7 @@ import (
 	"context"
 	"github.com/onosproject/onos-api/go/onos/e2sub/subscription"
 	e2tapi "github.com/onosproject/onos-api/go/onos/e2t/e2"
-	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_rc_pre/pdubuilder"
+	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/pdubuilder"
 	e2client "github.com/onosproject/onos-ric-sdk-go/pkg/e2"
 	"github.com/onosproject/onos-ric-sdk-go/pkg/e2/indication"
 	e2subscription "github.com/onosproject/onos-ric-sdk-go/pkg/e2/subscription"
@@ -86,7 +86,7 @@ func CreateMhoSubscriptionDetails(nodeID string) (subscription.SubscriptionDetai
 }
 
 func CreateMhoEventTrigger() ([]byte, error) {
-	e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmRcPreEventTriggerDefinitionUponChange()
+	e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmMhoEventTriggerDefinitionUponRcvMeasReport()
 	if err != nil {
 		return []byte{}, err
 	}

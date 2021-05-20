@@ -8,8 +8,8 @@ import (
 	"context"
 	"github.com/onosproject/onos-api/go/onos/e2sub/subscription"
 	e2tapi "github.com/onosproject/onos-api/go/onos/e2t/e2"
-	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_rc_pre/pdubuilder"
-	e2sm_rc_pre_ies "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_rc_pre/v1/e2sm-rc-pre-ies"
+	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/pdubuilder"
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-e2t/pkg/southbound/e2ap/types"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-mho/pkg/southbound/admin"
@@ -30,7 +30,7 @@ import (
 var log = logging.GetLogger("sb-ricapie2")
 
 const (
-	ServiceModelName       = "oran-e2sm-rc-pre"
+	ServiceModelName       = "oran-e2sm-mho"
 	ServiceModelVersion    = "v1"
 	ReportPeriodConfigPath = "/report_period/interval"
 )
@@ -190,9 +190,9 @@ func (s *E2Session) createSubscriptionRequest(nodeID string) (subscription.Subsc
 func (s *E2Session) createEventTriggerData() []byte {
 	log.Infof("Received period value: %v", s.ReportPeriodMs)
 
-	//e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmRcPreEventTriggerDefinitionPeriodic(int32(s.ReportPeriodMs))
+	//e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmMhoEventTriggerDefinitionPeriodic(int32(s.ReportPeriodMs))
 	// use reactive way in this stage - for the future, we can choose one of two options: proactive or reactive
-	e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmRcPreEventTriggerDefinitionUponChange()
+	e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmMhoEventTriggerDefinitionUponRcvMeasReport()
 	if err != nil {
 		log.Errorf("Failed to create event trigger definition data: %v", err)
 		return []byte{}
@@ -286,18 +286,19 @@ func (s *E2Session) subscribeE2T(indChan chan *store.E2NodeIndication, nodeID st
 				log.Errorf("Control response message is nil")
 			}
 
-			ctrlAck := ctrlRespMsg.GetControlAcknowledge()
+			// TODO TODO
+			//ctrlAck := ctrlRespMsg.GetControlAcknowledge()
 			ctrlFailure := ctrlRespMsg.GetControlFailure()
 
-			if ctrlAck != nil {
-				ctrlOutcome := &e2sm_rc_pre_ies.E2SmRcPreControlOutcome{}
-				err = proto.Unmarshal(ctrlAck.GetControlOutcome(), ctrlOutcome)
-				if err != nil {
-					log.Errorf("Failed to get control outcome - %v", err)
-				}
+			//if ctrlAck != nil {
+			//	ctrlOutcome := &e2sm_mho.E2SmMhoControlOutcome{}
+			//	err = proto.Unmarshal(ctrlAck.GetControlOutcome(), ctrlOutcome)
+			//	if err != nil {
+			//		log.Errorf("Failed to get control outcome - %v", err)
+			//	}
 
-				log.Infof("Received ACK message %v", ctrlOutcome.GetControlOutcomeFormat1())
-			}
+			//	log.Infof("Received ACK message %v", ctrlOutcome.GetControlOutcomeFormat1())
+			//}
 			if ctrlFailure != nil {
 				log.Errorf("Control Failure message arrived")
 			}
@@ -312,7 +313,7 @@ func (s *E2Session) subscribeE2T(indChan chan *store.E2NodeIndication, nodeID st
 
 }
 
-type E2SmRcPreControlHandler struct {
+type E2SmMhoControlHandler struct {
 	NodeID              string
 	ServiceModelName    e2tapi.ServiceModelName
 	ServiceModelVersion e2tapi.ServiceModelVersion
@@ -322,7 +323,7 @@ type E2SmRcPreControlHandler struct {
 	EncodingType        e2tapi.EncodingType
 }
 
-func (c *E2SmRcPreControlHandler) CreateRcControlRequest() (*e2tapi.ControlRequest, error) {
+func (c *E2SmMhoControlHandler) CreateRcControlRequest() (*e2tapi.ControlRequest, error) {
 	controlRequest := &e2tapi.ControlRequest{
 		E2NodeID: e2tapi.E2NodeID(c.NodeID),
 		Header: &e2tapi.RequestHeader{
@@ -339,22 +340,18 @@ func (c *E2SmRcPreControlHandler) CreateRcControlRequest() (*e2tapi.ControlReque
 	return controlRequest, nil
 }
 
-func (c *E2SmRcPreControlHandler) CreateRcControlHeader(cellID uint64, cellIDLen uint32, priority int32, plmnID []byte) ([]byte, error) {
-	eci := &e2sm_rc_pre_ies.BitString{
-		Value: cellID,
-		Len:   cellIDLen,
-	}
-	newE2SmRcPrePdu, err := pdubuilder.CreateE2SmRcPreControlHeader(priority, plmnID, eci)
+func (c *E2SmMhoControlHandler) CreateRcControlHeader(cellID uint64, cellIDLen uint32, priority int32, plmnID []byte) ([]byte, error) {
+	newE2SmMhoPdu, err := pdubuilder.CreateE2SmMhoControlHeader(priority)
 	if err != nil {
 		return []byte{}, err
 	}
 
-	err = newE2SmRcPrePdu.Validate()
+	err = newE2SmMhoPdu.Validate()
 	if err != nil {
 		return []byte{}, err
 	}
 
-	protoBytes, err := proto.Marshal(newE2SmRcPrePdu)
+	protoBytes, err := proto.Marshal(newE2SmMhoPdu)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -362,18 +359,18 @@ func (c *E2SmRcPreControlHandler) CreateRcControlHeader(cellID uint64, cellIDLen
 	return protoBytes, nil
 }
 
-func (c *E2SmRcPreControlHandler) CreateRcControlMessage(ranParamID int32, ranParamName string, ranParamValue int32) ([]byte, error) {
-	newE2SmRcPrePdu, err := pdubuilder.CreateE2SmRcPreControlMessage(ranParamID, ranParamName, ranParamValue)
+func (c *E2SmMhoControlHandler) CreateRcControlMessage(servingCgi *e2sm_mho.CellGlobalId, uedID *e2sm_mho.UeIdentity, targetCgi *e2sm_mho.CellGlobalId) ([]byte, error) {
+	newE2SmMhoPdu, err := pdubuilder.CreateE2SmMhoControlMessage(servingCgi, uedID, targetCgi)
 	if err != nil {
 		return []byte{}, err
 	}
 
-	err = newE2SmRcPrePdu.Validate()
+	err = newE2SmMhoPdu.Validate()
 	if err != nil {
 		return []byte{}, err
 	}
 
-	protoBytes, err := proto.Marshal(newE2SmRcPrePdu)
+	protoBytes, err := proto.Marshal(newE2SmMhoPdu)
 	if err != nil {
 		return []byte{}, err
 	}
