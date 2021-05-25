@@ -192,7 +192,7 @@ func (s *E2Session) createEventTriggerData() []byte {
 
 	//e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmMhoEventTriggerDefinitionPeriodic(int32(s.ReportPeriodMs))
 	// use reactive way in this stage - for the future, we can choose one of two options: proactive or reactive
-	e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmMhoEventTriggerDefinitionUponRcvMeasReport()
+	e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmMhoEventTriggerDefinition(e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC, int32(s.ReportPeriodMs))
 	if err != nil {
 		log.Errorf("Failed to create event trigger definition data: %v", err)
 		return []byte{}
@@ -268,6 +268,7 @@ func (s *E2Session) subscribeE2T(indChan chan *store.E2NodeIndication, nodeID st
 		select {
 		case indMsg := <-ch:
 			go func() {
+				log.Debugf("received MHO indMsg: %v", indMsg)
 				indChan <- &store.E2NodeIndication{
 					NodeID: nodeID,
 					IndMsg: indMsg,

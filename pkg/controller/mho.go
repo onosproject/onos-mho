@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var logPci = logging.GetLogger("controller", "pci")
+var log = logging.GetLogger("controller", "mho")
 
 // MhoCtrl is the controller for the KPI monitoring
 type MhoCtrl struct {
@@ -22,7 +22,7 @@ type MhoCtrl struct {
 
 // NewPciController returns the struct for PCI logic
 func NewMhoController(indChan chan *store.E2NodeIndication, ctrlReqChs map[string]chan *e2tapi.ControlRequest) *MhoCtrl {
-	logPci.Info("Start onos-mho Application Controller")
+	log.Info("Start onos-mho Application Controller")
 	return &MhoCtrl{
 		IndChan:         indChan,
 		CtrlReqChans:    ctrlReqChs,
@@ -37,7 +37,7 @@ func (c *MhoCtrl) Run() {
 func (c *MhoCtrl) listenIndChan() {
 	var err error
 	for indMsg := range c.IndChan {
-		logPci.Debugf("Raw message: %v", indMsg)
+		log.Debugf("Raw message: %v", indMsg)
 
 		indHeaderByte := indMsg.IndMsg.Payload.Header
 		indMessageByte := indMsg.IndMsg.Payload.Message
@@ -45,15 +45,22 @@ func (c *MhoCtrl) listenIndChan() {
 		indHeader := e2sm_mho.E2SmMhoIndicationHeader{}
 		err = proto.Unmarshal(indHeaderByte, &indHeader)
 		if err != nil {
-			logPci.Errorf("Error - Unmarshalling header protobytes to struct: %v", err)
+			log.Errorf("Error - Unmarshalling header protobytes to struct: %v", err)
 		}
 
 		indMessage := e2sm_mho.E2SmMhoIndicationMessage{}
 		err = proto.Unmarshal(indMessageByte, &indMessage)
 		if err != nil {
-			logPci.Errorf("Error - Unmarshalling message protobytes to struct: %v", err)
+			log.Errorf("Error - Unmarshalling message protobytes to struct: %v", err)
 		}
 
-		// Handle indication
+		c.handleIndMsg(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1())
+
 	}
+}
+
+func (c *MhoCtrl) handleIndMsg(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1) {
+	// TODO
+	log.Debugf("MHO indication header: %v", header)
+	log.Debugf("MHO indication message: %v", message)
 }
