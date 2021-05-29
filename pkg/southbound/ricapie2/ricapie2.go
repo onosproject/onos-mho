@@ -48,7 +48,7 @@ type E2Session struct {
 	configEventCh  chan event.Event
 }
 
-// NewSession creates a new southbound session of ONOS-MHOMON
+// NewSession creates a new southbound session of ONOS-MHO
 func NewSession(e2tEndpoint string, e2subEndpoint string, ricActionID int32, reportPeriodMs uint64) *E2Session {
 	log.Info("Creating RicAPIE2Session")
 	return &E2Session{
@@ -61,7 +61,7 @@ func NewSession(e2tEndpoint string, e2subEndpoint string, ricActionID int32, rep
 
 // Run starts the southbound to watch indication messages
 func (s *E2Session) Run(indChan chan *store.E2NodeIndication, ctrlReqChans map[string]chan *e2tapi.ControlRequest, adminSession *admin.E2AdminSession) {
-	log.Info("Started MHOMON Southbound session")
+	log.Info("Started MHO Southbound session")
 	s.configEventCh = make(chan event.Event)
 	go func() {
 		_ = s.watchConfigChanges()
