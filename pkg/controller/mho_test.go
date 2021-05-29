@@ -12,16 +12,16 @@ import (
 	"testing"
 )
 
-func TestNewPciController(t *testing.T) {
+func TestNewMhoController(t *testing.T) {
 	sampleIndChan := make(chan *store.E2NodeIndication)
 	sampleCtrlReqChans := make(map[string]chan *e2tapi.ControlRequest)
-	samplePciController := MhoCtrl{
+	sampleMhoController := MhoCtrl{
 		IndChan: sampleIndChan,
 		CtrlReqChans: sampleCtrlReqChans,
 	}
-	targetPciController := NewMhoController(sampleIndChan, sampleCtrlReqChans)
-	fmt.Printf("samplePciController: %v\n", &samplePciController)
-	fmt.Printf("targetPciController: %v\n", targetPciController)
+	targetMhoController := NewMhoController(sampleIndChan, sampleCtrlReqChans)
+	fmt.Printf("sampleMhoController: %v\n", &sampleMhoController)
+	fmt.Printf("targetMhoController: %v\n", targetMhoController)
 
-	assert.Equal(t, &samplePciController, targetPciController)
+	assert.Equal(t, &sampleMhoController, targetMhoController)
 }

@@ -48,7 +48,7 @@ type E2Session struct {
 	configEventCh  chan event.Event
 }
 
-// NewSession creates a new southbound session of ONOS-KPIMON
+// NewSession creates a new southbound session of ONOS-MHOMON
 func NewSession(e2tEndpoint string, e2subEndpoint string, ricActionID int32, reportPeriodMs uint64) *E2Session {
 	log.Info("Creating RicAPIE2Session")
 	return &E2Session{
@@ -61,7 +61,7 @@ func NewSession(e2tEndpoint string, e2subEndpoint string, ricActionID int32, rep
 
 // Run starts the southbound to watch indication messages
 func (s *E2Session) Run(indChan chan *store.E2NodeIndication, ctrlReqChans map[string]chan *e2tapi.ControlRequest, adminSession *admin.E2AdminSession) {
-	log.Info("Started KPIMON Southbound session")
+	log.Info("Started MHOMON Southbound session")
 	s.configEventCh = make(chan event.Event)
 	go func() {
 		_ = s.watchConfigChanges()
@@ -275,35 +275,19 @@ func (s *E2Session) subscribeE2T(indChan chan *store.E2NodeIndication, nodeID st
 				}
 			}()
 		case ctrlReqMsg := <-ctrlReqChan:
-			log.Infof("Received E2Node: %v, Session E2Node: %v - Raw message: %v", ctrlReqMsg.E2NodeID, nodeID, ctrlReqMsg)
-			if string(ctrlReqMsg.E2NodeID) != nodeID {
-				log.Errorf("E2Node ID does not match: E2Node ID E2Session - %v; E2Node ID in Ctrl Message - %v", nodeID, ctrlReqMsg.E2NodeID)
-				continue
-			}
-			ctrlRespMsg, err := client.Control(ctx, ctrlReqMsg)
-			if err != nil {
-				log.Errorf("Failed to send control message - %v", err)
-			} else if ctrlRespMsg == nil {
-				log.Errorf("Control response message is nil")
-			}
-
-			// TODO TODO
-			//ctrlAck := ctrlRespMsg.GetControlAcknowledge()
-			ctrlFailure := ctrlRespMsg.GetControlFailure()
-
-			//if ctrlAck != nil {
-			//	ctrlOutcome := &e2sm_mho.E2SmMhoControlOutcome{}
-			//	err = proto.Unmarshal(ctrlAck.GetControlOutcome(), ctrlOutcome)
-			//	if err != nil {
-			//		log.Errorf("Failed to get control outcome - %v", err)
-			//	}
-
-			//	log.Infof("Received ACK message %v", ctrlOutcome.GetControlOutcomeFormat1())
-			//}
-			if ctrlFailure != nil {
-				log.Errorf("Control Failure message arrived")
-			}
-
+			go func() {
+				log.Infof("Received E2Node: %v, Session E2Node: %v - Raw message: %v", ctrlReqMsg.E2NodeID, nodeID, ctrlReqMsg)
+				if string(ctrlReqMsg.E2NodeID) != nodeID {
+					log.Errorf("E2Node ID does not match: E2Node ID E2Session - %v; E2Node ID in Ctrl Message - %v", nodeID, ctrlReqMsg.E2NodeID)
+					return
+				}
+				ctrlRespMsg, err := client.Control(ctx, ctrlReqMsg)
+				if err != nil {
+					log.Errorf("Failed to send control message - %v", err)
+				} else if ctrlRespMsg == nil {
+					log.Errorf("Control response message is nil")
+				}
+			}()
 		case trigger := <-s.SubDelTrigger:
 			if trigger {
 				log.Info("Reset indChan to close subscription")
