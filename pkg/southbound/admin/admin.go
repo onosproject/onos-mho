@@ -21,7 +21,7 @@ type E2AdminSession struct {
 	E2TEndpoint string
 }
 
-// NewSession creates a new admin southbound session of ONOS-KPIMON
+// NewSession creates a new admin southbound session of ONOS-MHO
 func NewSession(e2tEndpoint string) *E2AdminSession {
 	log.Info("Creating RicAPIAdminSession")
 	return &E2AdminSession{

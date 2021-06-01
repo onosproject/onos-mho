@@ -53,7 +53,7 @@ func NewManager(config Config) *Manager {
 	}
 }
 
-// Manager is a manager for the PCI xAPP service
+// Manager is a manager for the MHO xAPP service
 type Manager struct {
 	Config   Config
 	Sessions SBSessions

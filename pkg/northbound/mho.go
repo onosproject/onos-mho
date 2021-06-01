@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// NewService returns a new PCI interface service.
+// NewService returns a new MHO interface service.
 func NewService(ctrl *controller.MhoCtrl) service.Service {
 	return &Service{
 		Ctrl: ctrl,
@@ -29,7 +29,7 @@ func (s Service) Register(r *grpc.Server) {
 	//server := &Server{
 	//	Ctrl: s.Ctrl,
 	//}
-	//mhoapi.RegisterPciServer(r, server)
+	//mhoapi.RegisterMhoServer(r, server)
 }
 
 type Server struct {
