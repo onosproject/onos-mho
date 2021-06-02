@@ -101,12 +101,13 @@ func (m *Manager) Start() error {
 		return err
 	}
 
-	// Start Southbound client to watch indication messages
-	m.Sessions.E2Session.ReportPeriodMs, err = m.getReportPeriod()
-	m.Sessions.E2Session.AppConfig = m.Config.AppConfig
-	if err != nil {
-		log.Errorf("Failed to get report period so period is set to 0ms: %v", err)
+	// Fetch config
+	if err = m.getConfig(); err != nil {
+		log.Errorf("Failed to get config: %v", err)
+		return err
 	}
+
+	m.Sessions.E2Session.AppConfig = m.Config.AppConfig
 
 	go m.Sessions.E2Session.Run(m.Chans.IndCh, m.Chans.CtrlReqChs, m.Sessions.AdminSession)
 	go m.Ctrls.MhoCtrl.Run()
@@ -152,14 +153,35 @@ func (m *Manager) startNorthboundServer() error {
 	return <-doneCh
 }
 
-func (m *Manager) getReportPeriod() (uint64, error) {
-	interval, _ := m.Config.AppConfig.Get(ricapie2.ReportPeriodConfigPath)
-	val, err := configutils.ToUint64(interval.Value)
-	if err != nil {
-		log.Error(err)
-		return 0, err
+func (m *Manager) getConfig() error {
+	var err error
+	if periodicEnabled, err := m.Config.AppConfig.Get(ricapie2.PeriodicEnabledConfigPath); err == nil {
+		m.Sessions.E2Session.PeriodicEnabled = periodicEnabled.Value.(bool)
+		if m.Sessions.E2Session.PeriodicEnabled {
+			log.Infof("Periodic trigger is enabled")
+			if interval, err := m.Config.AppConfig.Get(ricapie2.ReportPeriodConfigPath); err == nil {
+				if val, err := configutils.ToUint64(interval.Value); err == nil {
+					m.Sessions.E2Session.ReportPeriodMs = val
+					log.Infof("ReportPeriodMs: %v", m.Sessions.E2Session.ReportPeriodMs)
+				}
+			}
+		}
 	}
 
-	log.Infof("Received period value: %v", val)
-	return val, nil
+	if err == nil {
+		if uponRcvMeasReportEnabled, err := m.Config.AppConfig.Get(ricapie2.UponRcvMeasReportEnabledConfigPath); err == nil {
+			m.Sessions.E2Session.UponRcvMeasReportEnabled = uponRcvMeasReportEnabled.Value.(bool)
+			log.Info("UponRcvMeasReport trigger is enabled")
+		}
+	}
+
+	if err == nil {
+		if uponChangeRrcStatusEnabled, err := m.Config.AppConfig.Get(ricapie2.UponChangeRrcStatusEnabledConfigPath); err == nil {
+			m.Sessions.E2Session.UponChangeRrcStatusEnabled = uponChangeRrcStatusEnabled.Value.(bool)
+			log.Info("UponChangeRrcStatus trigger is enabled")
+		}
+	}
+
+	return err
+
 }
