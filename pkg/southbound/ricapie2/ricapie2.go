@@ -30,22 +30,32 @@ import (
 var log = logging.GetLogger("sb-ricapie2")
 
 const (
-	ServiceModelName       = "oran-e2sm-mho"
-	ServiceModelVersion    = "v1"
-	ReportPeriodConfigPath = "/report_period/interval"
+	ServiceModelName                     = "oran-e2sm-mho"
+	ServiceModelVersion                  = "v1"
+	PeriodicEnabledConfigPath            = "/trigger/periodic/enabled"
+	UponRcvMeasReportEnabledConfigPath   = "/trigger/upon_rcv_meas_report/enabled"
+	UponChangeRrcStatusEnabledConfigPath = "/trigger/upon_change_rrc_status/enabled"
+	ReportPeriodConfigPath               = "/trigger/periodic/report_period/interval"
 )
 
 // E2Session is responsible for mapping connections to and interactions with the northbound of ONOS-E2T
 type E2Session struct {
-	E2SubEndpoint  string
-	E2SubInstance  sdkSub.Context
-	SubDelTrigger  chan bool
-	E2TEndpoint    string
-	RicActionID    types.RicActionID
-	ReportPeriodMs uint64
-	AppConfig      *app.Config
-	mu             sync.RWMutex
-	configEventCh  chan event.Event
+	E2SubEndpoint                    string
+	E2PeriodicSubInstance            sdkSub.Context
+	E2UponRcvMeasReportSubInstance   sdkSub.Context
+	E2UponChangeRrcStatusSubInstance sdkSub.Context
+	PeriodicSubDelTrigger            chan bool
+	UponRcvMeasReportSubDelTrigger   chan bool
+	UponChangeRrcStatusSubDelTrigger chan bool
+	E2TEndpoint                      string
+	RicActionID                      types.RicActionID
+	PeriodicEnabled                  bool
+	UponRcvMeasReportEnabled         bool
+	UponChangeRrcStatusEnabled       bool
+	ReportPeriodMs                   uint64
+	AppConfig                        *app.Config
+	mu                               sync.RWMutex
+	configEventCh                    chan event.Event
 }
 
 // NewSession creates a new southbound session of ONOS-MHO
@@ -66,7 +76,7 @@ func (s *E2Session) Run(indChan chan *store.E2NodeIndication, ctrlReqChans map[s
 	go func() {
 		_ = s.watchConfigChanges()
 	}()
-	s.SubDelTrigger = make(chan bool)
+	s.PeriodicSubDelTrigger = make(chan bool)
 	s.manageConnections(indChan, ctrlReqChans, adminSession)
 }
 
@@ -93,7 +103,7 @@ func (s *E2Session) processConfigEvents() {
 			if err != nil {
 				log.Error(err)
 			}
-			err = s.deleteSuscription()
+			err = s.deleteSubscription()
 			if err != nil {
 				log.Error(err)
 			}
@@ -112,13 +122,16 @@ func (s *E2Session) watchConfigChanges() error {
 	return nil
 }
 
-func (s *E2Session) deleteSuscription() error {
-	err := s.E2SubInstance.Close()
-	if err != nil {
-		log.Error(err)
+func (s *E2Session) deleteSubscription() error {
+	if s.PeriodicEnabled {
+		err := s.E2PeriodicSubInstance.Close()
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		s.PeriodicSubDelTrigger <- true
 	}
-	s.SubDelTrigger <- true
-	return err
+	return nil
 }
 
 // manageConnections handles connections between onos-mho and ONOS-E2T/E2Sub.
@@ -160,7 +173,7 @@ func (s *E2Session) manageConnection(indChan chan *store.E2NodeIndication, nodeI
 	}
 }
 
-func (s *E2Session) createSubscriptionRequest(nodeID string) (subscription.SubscriptionDetails, error) {
+func (s *E2Session) createSubscriptionRequest(nodeID string, triggerType e2sm_mho.MhoTriggerType) (subscription.SubscriptionDetails, error) {
 
 	return subscription.SubscriptionDetails{
 		E2NodeID: subscription.E2NodeID(nodeID),
@@ -171,7 +184,7 @@ func (s *E2Session) createSubscriptionRequest(nodeID string) (subscription.Subsc
 		EventTrigger: subscription.EventTrigger{
 			Payload: subscription.Payload{
 				Encoding: subscription.Encoding_ENCODING_PROTO,
-				Data:     s.createEventTriggerData(),
+				Data:     s.createEventTriggerData(triggerType),
 			},
 		},
 		Actions: []subscription.Action{
@@ -187,12 +200,12 @@ func (s *E2Session) createSubscriptionRequest(nodeID string) (subscription.Subsc
 	}, nil
 }
 
-func (s *E2Session) createEventTriggerData() []byte {
+func (s *E2Session) createEventTriggerData(triggerType e2sm_mho.MhoTriggerType) []byte {
 	log.Infof("Received period value: %v", s.ReportPeriodMs)
 
 	//e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmMhoEventTriggerDefinitionPeriodic(int32(s.ReportPeriodMs))
 	// use reactive way in this stage - for the future, we can choose one of two options: proactive or reactive
-	e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmMhoEventTriggerDefinition(e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC, int32(s.ReportPeriodMs))
+	e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmMhoEventTriggerDefinition(triggerType, int32(s.ReportPeriodMs))
 	if err != nil {
 		log.Errorf("Failed to create event trigger definition data: %v", err)
 		return []byte{}
@@ -251,17 +264,54 @@ func (s *E2Session) subscribeE2T(indChan chan *store.E2NodeIndication, nodeID st
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	subReq, err := s.createSubscriptionRequest(nodeID)
-	if err != nil {
-		log.Warn("Can't create SubsdcriptionRequest message")
-		return err
+	if s.PeriodicEnabled {
+		subReq, err := s.createSubscriptionRequest(nodeID, e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC)
+		if err != nil {
+			log.Warnf("Subscription request create failed, triggerType: %v, err: ", e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC, err)
+			return err
+		}
+
+		s.E2PeriodicSubInstance, err = client.Subscribe(ctx, subReq, ch)
+		if err != nil {
+			log.Warnf("Subscription request send failed, triggerType: %v, err: ", e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC, err)
+			return err
+		}
 	}
 
-	s.E2SubInstance, err = client.Subscribe(ctx, subReq, ch)
-	if err != nil {
-		log.Warn("Can't send SubscriptionRequest message")
-		return err
+	log.Debugf("Subscription request sent, triggerType: %v", e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC)
+
+	if s.UponRcvMeasReportEnabled {
+		subReq, err := s.createSubscriptionRequest(nodeID, e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT)
+		if err != nil {
+			log.Warnf("Subscription request create failed, triggerType: %v, err: ", e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT, err)
+			return err
+		}
+
+		s.E2UponRcvMeasReportSubInstance, err = client.Subscribe(ctx, subReq, ch)
+		if err != nil {
+			log.Warnf("Subscription request send failed, triggerType: %v, err: ", e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT, err)
+			return err
+		}
+
+		log.Debugf("Subscription request sent, triggerType: %v", e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT)
 	}
+
+
+	if s.UponChangeRrcStatusEnabled {
+		subReq, err := s.createSubscriptionRequest(nodeID, e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_CHANGE_RRC_STATUS)
+		if err != nil {
+			log.Errorf("Subscription request create failed, triggerType: %v, err: ", e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_CHANGE_RRC_STATUS, err)
+			return err
+		}
+
+		s.E2UponChangeRrcStatusSubInstance, err = client.Subscribe(ctx, subReq, ch)
+		if err != nil {
+			log.Errorf("Subscription request send failed, triggerType: %v, err: ", e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_CHANGE_RRC_STATUS, err)
+			return err
+		}
+	}
+
+	log.Debugf("Subscription request sent, triggerType: %v", e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_CHANGE_RRC_STATUS)
 
 	log.Infof("Start forwarding Indication message to MHO controller")
 	for {
@@ -288,7 +338,7 @@ func (s *E2Session) subscribeE2T(indChan chan *store.E2NodeIndication, nodeID st
 					log.Errorf("Control response message is nil")
 				}
 			}()
-		case trigger := <-s.SubDelTrigger:
+		case trigger := <-s.PeriodicSubDelTrigger:
 			if trigger {
 				log.Info("Reset indChan to close subscription")
 				return nil
