@@ -6,6 +6,7 @@ package manager
 
 import (
 	e2tapi "github.com/onosproject/onos-api/go/onos/e2t/e2"
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-lib-go/pkg/northbound"
 	"github.com/onosproject/onos-mho/pkg/controller"
@@ -154,34 +155,84 @@ func (m *Manager) startNorthboundServer() error {
 }
 
 func (m *Manager) getConfig() error {
-	var err error
 	if periodicEnabled, err := m.Config.AppConfig.Get(ricapie2.PeriodicEnabledConfigPath); err == nil {
-		m.Sessions.E2Session.PeriodicEnabled = periodicEnabled.Value.(bool)
-		if m.Sessions.E2Session.PeriodicEnabled {
+		m.Sessions.E2Session.Trigger[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC] = periodicEnabled.Value.(bool)
+		if m.Sessions.E2Session.Trigger[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC] {
 			log.Infof("Periodic trigger is enabled")
 			if interval, err := m.Config.AppConfig.Get(ricapie2.ReportPeriodConfigPath); err == nil {
 				if val, err := configutils.ToUint64(interval.Value); err == nil {
 					m.Sessions.E2Session.ReportPeriodMs = val
 					log.Infof("ReportPeriodMs: %v", m.Sessions.E2Session.ReportPeriodMs)
 				}
+			} else {
+				return err
 			}
+		} else {
+			m.Sessions.E2Session.ReportPeriodMs = 0
 		}
+	} else {
+		return err
 	}
 
-	if err == nil {
-		if uponRcvMeasReportEnabled, err := m.Config.AppConfig.Get(ricapie2.UponRcvMeasReportEnabledConfigPath); err == nil {
-			m.Sessions.E2Session.UponRcvMeasReportEnabled = uponRcvMeasReportEnabled.Value.(bool)
-			log.Info("UponRcvMeasReport trigger is enabled")
-		}
+	if uponRcvMeasReportEnabled, err := m.Config.AppConfig.Get(ricapie2.UponRcvMeasReportEnabledConfigPath); err == nil {
+		m.Sessions.E2Session.Trigger[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT] = uponRcvMeasReportEnabled.Value.(bool)
+		log.Info("UponRcvMeasReport trigger is enabled")
+	} else {
+		return err
 	}
 
-	if err == nil {
-		if uponChangeRrcStatusEnabled, err := m.Config.AppConfig.Get(ricapie2.UponChangeRrcStatusEnabledConfigPath); err == nil {
-			m.Sessions.E2Session.UponChangeRrcStatusEnabled = uponChangeRrcStatusEnabled.Value.(bool)
-			log.Info("UponChangeRrcStatus trigger is enabled")
-		}
+	if uponChangeRrcStatusEnabled, err := m.Config.AppConfig.Get(ricapie2.UponChangeRrcStatusEnabledConfigPath); err == nil {
+		m.Sessions.E2Session.Trigger[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_CHANGE_RRC_STATUS] = uponChangeRrcStatusEnabled.Value.(bool)
+		log.Info("UponChangeRrcStatus trigger is enabled")
+	} else {
+		return err
 	}
 
-	return err
+	if a3OffsetRange, err := m.Config.AppConfig.Get(controller.A3OffsetRangeConfigPath); err == nil {
+		if m.Ctrls.MhoCtrl.HoParms.A3OffsetRange, err = configutils.ToUint64(a3OffsetRange.Value); err != nil {
+			return err
+		}
+		log.Infof("A3OffsetRange: %v", m.Ctrls.MhoCtrl.HoParms.A3OffsetRange)
+	} else {
+		return err
+	}
+
+	if hysteresisRange, err := m.Config.AppConfig.Get(controller.HysteresisRangeConfigPath); err == nil {
+		if m.Ctrls.MhoCtrl.HoParms.HysteresisRange, err = configutils.ToUint64(hysteresisRange.Value); err != nil {
+			return err
+		}
+		log.Infof("HysteresisRange: %v", m.Ctrls.MhoCtrl.HoParms.HysteresisRange)
+	} else {
+		return err
+	}
+
+	if cellIndividualOffset, err := m.Config.AppConfig.Get(controller.CellIndividualOffsetConfigPath); err == nil {
+		if m.Ctrls.MhoCtrl.HoParms.CellIndividualOffset, err = configutils.ToString(cellIndividualOffset.Value); err != nil {
+			return err
+		}
+		log.Infof("CellIndividualOffset: %v", m.Ctrls.MhoCtrl.HoParms.CellIndividualOffset)
+	} else {
+		return err
+	}
+
+	if frequencyOffset, err := m.Config.AppConfig.Get(controller.FrequencyOffsetConfigPath); err == nil {
+		if m.Ctrls.MhoCtrl.HoParms.FrequencyOffset, err = configutils.ToString(frequencyOffset.Value); err != nil {
+			return err
+		}
+		log.Infof("FrequencyOffset: %v", m.Ctrls.MhoCtrl.HoParms.FrequencyOffset)
+	} else {
+		return err
+	}
+
+	if timeToTrigger, err := m.Config.AppConfig.Get(controller.TimeToTriggerConfigPath); err == nil {
+		if m.Ctrls.MhoCtrl.HoParms.TimeToTrigger, err = configutils.ToString(timeToTrigger.Value); err != nil {
+			return err
+		}
+		log.Infof("TimeToTrigger: %v", m.Ctrls.MhoCtrl.HoParms.TimeToTrigger)
+	} else {
+		return err
+	}
+
+	return nil
 
 }
