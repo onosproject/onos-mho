@@ -62,8 +62,10 @@ protos:
 
 onos-mho-docker: # @HELP build onos-mho Docker image
 onos-mho-docker:
+	@go mod vendor
 	docker build . -f build/onos-mho/Dockerfile \
 		-t onosproject/onos-mho:${ONOS_MHO_VERSION}
+	@rm -rf vendor
 
 images: # @HELP build all Docker images
 images: build onos-mho-docker

@@ -8,8 +8,8 @@ const (
 	A3OffsetRangeConfigPath        = "/hoParameters/A3OffsetRange"
 	HysteresisRangeConfigPath      = "/hoParameters/HysteresisRange"
 	CellIndividualOffsetConfigPath = "/hoParameters/CellIndividualOffset"
-	FrequencyOffsetConfigPath      = "hoParameters/FrequencyOffset"
-	TimeToTriggerConfigPath        = "hoParameters/TimeToTrigger"
+	FrequencyOffsetConfigPath      = "/hoParameters/FrequencyOffset"
+	TimeToTriggerConfigPath        = "/hoParameters/TimeToTrigger"
 )
 
 // HandOverController is the handover controller
