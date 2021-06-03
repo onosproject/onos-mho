@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	ControlPriority = 10
+	ControlPriority                = 10
 )
 
 var log = logging.GetLogger("controller", "mho")
@@ -23,14 +23,17 @@ var log = logging.GetLogger("controller", "mho")
 type MhoCtrl struct {
 	IndChan      chan *store.E2NodeIndication
 	CtrlReqChans map[string]chan *e2tapi.ControlRequest
+	HoCtrl      *HandOverController
 }
 
 // NewMhoController returns the struct for MHO logic
 func NewMhoController(indChan chan *store.E2NodeIndication, ctrlReqChs map[string]chan *e2tapi.ControlRequest) *MhoCtrl {
 	log.Info("Start onos-mho Application Controller")
+	hoCtrl := NewHandOverController()
 	return &MhoCtrl{
 		IndChan:      indChan,
 		CtrlReqChans: ctrlReqChs,
+		HoCtrl:      hoCtrl,
 	}
 }
 
@@ -88,7 +91,7 @@ func (c *MhoCtrl) control(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, messa
 
 	// send control message to the E2Node
 	e2smMhoControlHandler := &E2SmMhoControlHandler{
-		NodeID: e2NodeID,
+		NodeID:              e2NodeID,
 		EncodingType:        e2tapi.EncodingType_PROTO,
 		ServiceModelName:    ricapie2.ServiceModelName,
 		ServiceModelVersion: ricapie2.ServiceModelVersion,
@@ -106,7 +109,7 @@ func (c *MhoCtrl) control(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, messa
 	log.Debugf("cellIdLen:%d, plmnID:%v, len:%d", cellIDLen, plmnID, len(plmnID))
 
 	if e2smMhoControlHandler.ControlHeader, err = e2smMhoControlHandler.CreateMhoControlHeader(cellID, cellIDLen, int32(ControlPriority), plmnID); err == nil {
-		if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI,ueID, targetCGI); err == nil {
+		if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, ueID, targetCGI); err == nil {
 			if controlRequest, err := e2smMhoControlHandler.CreateMhoControlRequest(); err == nil {
 				log.Debugf("Control Request message for e2NodeID %s: %v", e2NodeID, controlRequest)
 				c.CtrlReqChans[e2NodeID] <- controlRequest
