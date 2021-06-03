@@ -15,9 +15,11 @@ import (
 func TestNewMhoController(t *testing.T) {
 	sampleIndChan := make(chan *store.E2NodeIndication)
 	sampleCtrlReqChans := make(map[string]chan *e2tapi.ControlRequest)
+	hoCtrl := NewHandOverController()
 	sampleMhoController := MhoCtrl{
 		IndChan: sampleIndChan,
 		CtrlReqChans: sampleCtrlReqChans,
+		HoCtrl: hoCtrl,
 	}
 	targetMhoController := NewMhoController(sampleIndChan, sampleCtrlReqChans)
 	fmt.Printf("sampleMhoController: %v\n", &sampleMhoController)
