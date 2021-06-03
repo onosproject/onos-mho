@@ -23,16 +23,17 @@ var log = logging.GetLogger("controller", "mho")
 type MhoCtrl struct {
 	IndChan      chan *store.E2NodeIndication
 	CtrlReqChans map[string]chan *e2tapi.ControlRequest
-	HoParms      *HandOver
+	HoCtrl      *HandOverController
 }
 
 // NewMhoController returns the struct for MHO logic
 func NewMhoController(indChan chan *store.E2NodeIndication, ctrlReqChs map[string]chan *e2tapi.ControlRequest) *MhoCtrl {
 	log.Info("Start onos-mho Application Controller")
+	hoCtrl := NewHandOverController()
 	return &MhoCtrl{
 		IndChan:      indChan,
 		CtrlReqChans: ctrlReqChs,
-		HoParms:      &HandOver{},
+		HoCtrl:      hoCtrl,
 	}
 }
 

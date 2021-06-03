@@ -189,46 +189,46 @@ func (m *Manager) getConfig() error {
 	}
 
 	if a3OffsetRange, err := m.Config.AppConfig.Get(controller.A3OffsetRangeConfigPath); err == nil {
-		if m.Ctrls.MhoCtrl.HoParms.A3OffsetRange, err = configutils.ToUint64(a3OffsetRange.Value); err != nil {
+		if m.Ctrls.MhoCtrl.HoCtrl.A3OffsetRange, err = configutils.ToUint64(a3OffsetRange.Value); err != nil {
 			return err
 		}
-		log.Infof("A3OffsetRange: %v", m.Ctrls.MhoCtrl.HoParms.A3OffsetRange)
+		log.Infof("A3OffsetRange: %v", m.Ctrls.MhoCtrl.HoCtrl.A3OffsetRange)
 	} else {
 		return err
 	}
 
 	if hysteresisRange, err := m.Config.AppConfig.Get(controller.HysteresisRangeConfigPath); err == nil {
-		if m.Ctrls.MhoCtrl.HoParms.HysteresisRange, err = configutils.ToUint64(hysteresisRange.Value); err != nil {
+		if m.Ctrls.MhoCtrl.HoCtrl.HysteresisRange, err = configutils.ToUint64(hysteresisRange.Value); err != nil {
 			return err
 		}
-		log.Infof("HysteresisRange: %v", m.Ctrls.MhoCtrl.HoParms.HysteresisRange)
+		log.Infof("HysteresisRange: %v", m.Ctrls.MhoCtrl.HoCtrl.HysteresisRange)
 	} else {
 		return err
 	}
 
 	if cellIndividualOffset, err := m.Config.AppConfig.Get(controller.CellIndividualOffsetConfigPath); err == nil {
-		if m.Ctrls.MhoCtrl.HoParms.CellIndividualOffset, err = configutils.ToString(cellIndividualOffset.Value); err != nil {
+		if m.Ctrls.MhoCtrl.HoCtrl.CellIndividualOffset, err = configutils.ToString(cellIndividualOffset.Value); err != nil {
 			return err
 		}
-		log.Infof("CellIndividualOffset: %v", m.Ctrls.MhoCtrl.HoParms.CellIndividualOffset)
+		log.Infof("CellIndividualOffset: %v", m.Ctrls.MhoCtrl.HoCtrl.CellIndividualOffset)
 	} else {
 		return err
 	}
 
 	if frequencyOffset, err := m.Config.AppConfig.Get(controller.FrequencyOffsetConfigPath); err == nil {
-		if m.Ctrls.MhoCtrl.HoParms.FrequencyOffset, err = configutils.ToString(frequencyOffset.Value); err != nil {
+		if m.Ctrls.MhoCtrl.HoCtrl.FrequencyOffset, err = configutils.ToString(frequencyOffset.Value); err != nil {
 			return err
 		}
-		log.Infof("FrequencyOffset: %v", m.Ctrls.MhoCtrl.HoParms.FrequencyOffset)
+		log.Infof("FrequencyOffset: %v", m.Ctrls.MhoCtrl.HoCtrl.FrequencyOffset)
 	} else {
 		return err
 	}
 
 	if timeToTrigger, err := m.Config.AppConfig.Get(controller.TimeToTriggerConfigPath); err == nil {
-		if m.Ctrls.MhoCtrl.HoParms.TimeToTrigger, err = configutils.ToString(timeToTrigger.Value); err != nil {
+		if m.Ctrls.MhoCtrl.HoCtrl.TimeToTrigger, err = configutils.ToString(timeToTrigger.Value); err != nil {
 			return err
 		}
-		log.Infof("TimeToTrigger: %v", m.Ctrls.MhoCtrl.HoParms.TimeToTrigger)
+		log.Infof("TimeToTrigger: %v", m.Ctrls.MhoCtrl.HoCtrl.TimeToTrigger)
 	} else {
 		return err
 	}

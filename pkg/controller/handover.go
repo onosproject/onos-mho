@@ -12,11 +12,16 @@ const (
 	TimeToTriggerConfigPath        = "hoParameters/TimeToTrigger"
 )
 
-// HoParms is the handover parameters
-type HandOver struct {
+// HandOverController is the handover controller
+type HandOverController struct {
 	A3OffsetRange        uint64
 	HysteresisRange      uint64
 	CellIndividualOffset string
 	FrequencyOffset      string
 	TimeToTrigger        string
 }
+
+func NewHandOverController () *HandOverController{
+	return &HandOverController{}
+}
+
