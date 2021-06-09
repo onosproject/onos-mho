@@ -30,7 +30,6 @@ type ueData struct {
 	header    *e2sm_mho.E2SmMhoIndicationHeaderFormat1
 	message   *e2sm_mho.E2SmMhoIndicationMessageFormat1
 	ueID      *e2sm_mho.UeIdentity
-	plmnID    []byte
 	e2NodeID  string
 	servingCGI *e2sm_mho.CellGlobalId
 }
@@ -50,7 +49,7 @@ func NewMhoController(indChan chan *store.E2NodeIndication, ctrlReqChs map[strin
 		IndChan:      indChan,
 		CtrlReqChans: ctrlReqChs,
 		HoCtrl:       NewHandOverController(),
-		UeCache:        make(map[id.ID]ueData, 0),
+		UeCache:        make(map[id.ID]ueData),
 	}
 }
 
@@ -209,6 +208,9 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 	}
 
 	nci, err := strconv.Atoi(ho.TargetCell.GetID().String())
+	if err != nil {
+		return err
+	}
 	targetCGI := &e2sm_mho.CellGlobalId{
 		CellGlobalId: &e2sm_mho.CellGlobalId_NrCgi{
 			NrCgi: &e2sm_mho.Nrcgi{
