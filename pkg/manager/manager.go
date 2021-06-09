@@ -207,7 +207,7 @@ func (m *Manager) getConfig() error {
 	}
 
 	if cellIndividualOffset, err := m.Config.AppConfig.Get(controller.CellIndividualOffsetConfigPath); err == nil {
-		if m.Ctrls.MhoCtrl.HoCtrl.CellIndividualOffset, err = configutils.ToString(cellIndividualOffset.Value); err != nil {
+		if m.Ctrls.MhoCtrl.HoCtrl.CellIndividualOffset, err = configutils.ToUint64(cellIndividualOffset.Value); err != nil {
 			return err
 		}
 		log.Infof("CellIndividualOffset: %v", m.Ctrls.MhoCtrl.HoCtrl.CellIndividualOffset)
@@ -216,7 +216,7 @@ func (m *Manager) getConfig() error {
 	}
 
 	if frequencyOffset, err := m.Config.AppConfig.Get(controller.FrequencyOffsetConfigPath); err == nil {
-		if m.Ctrls.MhoCtrl.HoCtrl.FrequencyOffset, err = configutils.ToString(frequencyOffset.Value); err != nil {
+		if m.Ctrls.MhoCtrl.HoCtrl.FrequencyOffset, err = configutils.ToUint64(frequencyOffset.Value); err != nil {
 			return err
 		}
 		log.Infof("FrequencyOffset: %v", m.Ctrls.MhoCtrl.HoCtrl.FrequencyOffset)
@@ -225,7 +225,7 @@ func (m *Manager) getConfig() error {
 	}
 
 	if timeToTrigger, err := m.Config.AppConfig.Get(controller.TimeToTriggerConfigPath); err == nil {
-		if m.Ctrls.MhoCtrl.HoCtrl.TimeToTrigger, err = configutils.ToString(timeToTrigger.Value); err != nil {
+		if m.Ctrls.MhoCtrl.HoCtrl.TimeToTrigger, err = configutils.ToUint64(timeToTrigger.Value); err != nil {
 			return err
 		}
 		log.Infof("TimeToTrigger: %v", m.Ctrls.MhoCtrl.HoCtrl.TimeToTrigger)

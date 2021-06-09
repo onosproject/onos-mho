@@ -283,8 +283,12 @@ func (s *E2Session) subscribeE2T(indChan chan *store.E2NodeIndication, nodeID st
 	defer cancel()
 
 	for triggerType := range s.Trigger {
-		if err = s.subscriptionRequest(ctx, client, ch, nodeID, triggerType); err != nil {
-			log.Errorf("Subscription request failed, nodeID: %v, trigger: %v, err: %v", nodeID, triggerType, err)
+		for {
+			if err = s.subscriptionRequest(ctx, client, ch, nodeID, triggerType); err == nil {
+				break
+			}
+			log.Warnf("Subscription request failed, nodeID: %v, trigger: %v, err: %v", nodeID, triggerType, err)
+			time.Sleep(1 * time.Second)
 		}
 	}
 
