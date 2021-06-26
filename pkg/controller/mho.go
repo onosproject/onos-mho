@@ -6,6 +6,7 @@ package controller
 
 import (
 	"fmt"
+	"sync"
 	e2tapi "github.com/onosproject/onos-api/go/onos/e2t/e2"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
@@ -39,6 +40,7 @@ type MhoCtrl struct {
 	IndChan      chan *store.E2NodeIndication
 	CtrlReqChans map[string]chan *e2tapi.ControlRequest
 	HoCtrl       *HandOverController
+	UeCacheLock *sync.RWMutex
 	UeCache        map[id.ID]ueData
 }
 
@@ -49,6 +51,7 @@ func NewMhoController(indChan chan *store.E2NodeIndication, ctrlReqChs map[strin
 		IndChan:      indChan,
 		CtrlReqChans: ctrlReqChs,
 		HoCtrl:       NewHandOverController(),
+		UeCacheLock: &sync.RWMutex{},
 		UeCache:        make(map[id.ID]ueData),
 	}
 }
@@ -163,6 +166,8 @@ func (c *MhoCtrl) handleIndMsgFormat1(header *e2sm_mho.E2SmMhoIndicationHeaderFo
 
 func (c *MhoCtrl) cacheUE(id id.ID, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1,
 	message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+	c.UeCacheLock.Lock()
+	defer c.UeCacheLock.Unlock()
 	c.UeCache[id] = ueData{
 		header: header,
 		message: message,
@@ -180,8 +185,10 @@ func (c *MhoCtrl) handleIndMsgFormat2(header *e2sm_mho.E2SmMhoIndicationHeaderFo
 }
 
 func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
-	var err error
+	c.UeCacheLock.RLock()
+	defer c.UeCacheLock.RUnlock()
 
+	var err error
 	id := ho.UE.GetID()
 
 	ue, ok := c.UeCache[id]
