@@ -180,7 +180,7 @@ func (c *MhoCtrl) cacheUE(id id.ID, header *e2sm_mho.E2SmMhoIndicationHeaderForm
 
 func (c *MhoCtrl) handleIndMsgFormat2(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
 	// TODO
-	log.Info("Ignore indication message format 2")
+	log.Debug("Ignore indication message format 2")
 
 }
 
