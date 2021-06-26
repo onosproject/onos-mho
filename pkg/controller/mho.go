@@ -6,7 +6,6 @@ package controller
 
 import (
 	"fmt"
-	"sync"
 	e2tapi "github.com/onosproject/onos-api/go/onos/e2t/e2"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
@@ -19,6 +18,7 @@ import (
 	meastype "github.com/onosproject/rrm-son-lib/pkg/model/measurement/type"
 	"google.golang.org/protobuf/proto"
 	"strconv"
+	"sync"
 )
 
 const (
@@ -28,10 +28,10 @@ const (
 var log = logging.GetLogger("controller", "mho")
 
 type ueData struct {
-	header    *e2sm_mho.E2SmMhoIndicationHeaderFormat1
-	message   *e2sm_mho.E2SmMhoIndicationMessageFormat1
-	ueID      *e2sm_mho.UeIdentity
-	e2NodeID  string
+	header     *e2sm_mho.E2SmMhoIndicationHeaderFormat1
+	message    *e2sm_mho.E2SmMhoIndicationMessageFormat1
+	ueID       *e2sm_mho.UeIdentity
+	e2NodeID   string
 	servingCGI *e2sm_mho.CellGlobalId
 }
 
@@ -40,8 +40,8 @@ type MhoCtrl struct {
 	IndChan      chan *store.E2NodeIndication
 	CtrlReqChans map[string]chan *e2tapi.ControlRequest
 	HoCtrl       *HandOverController
-	UeCacheLock *sync.RWMutex
-	UeCache        map[id.ID]ueData
+	UeCacheLock  *sync.RWMutex
+	UeCache      map[id.ID]ueData
 }
 
 // NewMhoController returns the struct for MHO logic
@@ -51,8 +51,8 @@ func NewMhoController(indChan chan *store.E2NodeIndication, ctrlReqChs map[strin
 		IndChan:      indChan,
 		CtrlReqChans: ctrlReqChs,
 		HoCtrl:       NewHandOverController(),
-		UeCacheLock: &sync.RWMutex{},
-		UeCache:        make(map[id.ID]ueData),
+		UeCacheLock:  &sync.RWMutex{},
+		UeCache:      make(map[id.ID]ueData),
 	}
 }
 
@@ -169,10 +169,10 @@ func (c *MhoCtrl) cacheUE(id id.ID, header *e2sm_mho.E2SmMhoIndicationHeaderForm
 	c.UeCacheLock.Lock()
 	defer c.UeCacheLock.Unlock()
 	c.UeCache[id] = ueData{
-		header: header,
-		message: message,
-		ueID: message.GetUeId(),
-		e2NodeID: e2NodeID,
+		header:     header,
+		message:    message,
+		ueID:       message.GetUeId(),
+		e2NodeID:   e2NodeID,
 		servingCGI: header.GetCgi(),
 	}
 
@@ -204,7 +204,7 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 	servingCGI := ue.servingCGI
 	cellID := servingCGI.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
 	cellIDLen := servingCGI.GetNrCgi().GetNRcellIdentity().GetValue().GetLen()
-    plmnID := servingCGI.GetNrCgi().GetPLmnIdentity().GetValue()
+	plmnID := servingCGI.GetNrCgi().GetPLmnIdentity().GetValue()
 
 	e2smMhoControlHandler := &E2SmMhoControlHandler{
 		NodeID:              e2NodeID,
@@ -227,7 +227,7 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 				NRcellIdentity: &e2sm_mho.NrcellIdentity{
 					Value: &e2sm_mho.BitString{
 						Value: uint64(nci),
-						Len: 36,
+						Len:   36,
 					},
 				},
 			},
