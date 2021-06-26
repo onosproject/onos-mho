@@ -237,7 +237,7 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 	if e2smMhoControlHandler.ControlHeader, err = e2smMhoControlHandler.CreateMhoControlHeader(cellID, cellIDLen, int32(ControlPriority), plmnID); err == nil {
 		if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, ueID, targetCGI); err == nil {
 			if controlRequest, err := e2smMhoControlHandler.CreateMhoControlRequest(); err == nil {
-				log.Debugf("Control Request message for e2NodeID %s: %v", e2NodeID, controlRequest)
+				log.Infof("HO Control Request, imsi:%v, sCell:%v, tCell:%v", ueID, cellID, nci)
 				c.CtrlReqChans[e2NodeID] <- controlRequest
 			}
 		}
