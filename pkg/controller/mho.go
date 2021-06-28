@@ -18,6 +18,7 @@ import (
 	meastype "github.com/onosproject/rrm-son-lib/pkg/model/measurement/type"
 	"google.golang.org/protobuf/proto"
 	"strconv"
+	"sync"
 )
 
 const (
@@ -27,10 +28,10 @@ const (
 var log = logging.GetLogger("controller", "mho")
 
 type ueData struct {
-	header    *e2sm_mho.E2SmMhoIndicationHeaderFormat1
-	message   *e2sm_mho.E2SmMhoIndicationMessageFormat1
-	ueID      *e2sm_mho.UeIdentity
-	e2NodeID  string
+	header     *e2sm_mho.E2SmMhoIndicationHeaderFormat1
+	message    *e2sm_mho.E2SmMhoIndicationMessageFormat1
+	ueID       *e2sm_mho.UeIdentity
+	e2NodeID   string
 	servingCGI *e2sm_mho.CellGlobalId
 }
 
@@ -39,7 +40,8 @@ type MhoCtrl struct {
 	IndChan      chan *store.E2NodeIndication
 	CtrlReqChans map[string]chan *e2tapi.ControlRequest
 	HoCtrl       *HandOverController
-	UeCache        map[id.ID]ueData
+	UeCacheLock  *sync.RWMutex
+	UeCache      map[id.ID]ueData
 }
 
 // NewMhoController returns the struct for MHO logic
@@ -49,7 +51,8 @@ func NewMhoController(indChan chan *store.E2NodeIndication, ctrlReqChs map[strin
 		IndChan:      indChan,
 		CtrlReqChans: ctrlReqChs,
 		HoCtrl:       NewHandOverController(),
-		UeCache:        make(map[id.ID]ueData),
+		UeCacheLock:  &sync.RWMutex{},
+		UeCache:      make(map[id.ID]ueData),
 	}
 }
 
@@ -163,11 +166,13 @@ func (c *MhoCtrl) handleIndMsgFormat1(header *e2sm_mho.E2SmMhoIndicationHeaderFo
 
 func (c *MhoCtrl) cacheUE(id id.ID, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1,
 	message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+	c.UeCacheLock.Lock()
+	defer c.UeCacheLock.Unlock()
 	c.UeCache[id] = ueData{
-		header: header,
-		message: message,
-		ueID: message.GetUeId(),
-		e2NodeID: e2NodeID,
+		header:     header,
+		message:    message,
+		ueID:       message.GetUeId(),
+		e2NodeID:   e2NodeID,
 		servingCGI: header.GetCgi(),
 	}
 
@@ -175,13 +180,15 @@ func (c *MhoCtrl) cacheUE(id id.ID, header *e2sm_mho.E2SmMhoIndicationHeaderForm
 
 func (c *MhoCtrl) handleIndMsgFormat2(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
 	// TODO
-	log.Info("Ignore indication message format 2")
+	log.Debug("Ignore indication message format 2")
 
 }
 
 func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
-	var err error
+	c.UeCacheLock.RLock()
+	defer c.UeCacheLock.RUnlock()
 
+	var err error
 	id := ho.UE.GetID()
 
 	ue, ok := c.UeCache[id]
@@ -197,7 +204,7 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 	servingCGI := ue.servingCGI
 	cellID := servingCGI.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
 	cellIDLen := servingCGI.GetNrCgi().GetNRcellIdentity().GetValue().GetLen()
-    plmnID := servingCGI.GetNrCgi().GetPLmnIdentity().GetValue()
+	plmnID := servingCGI.GetNrCgi().GetPLmnIdentity().GetValue()
 
 	e2smMhoControlHandler := &E2SmMhoControlHandler{
 		NodeID:              e2NodeID,
@@ -220,7 +227,7 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 				NRcellIdentity: &e2sm_mho.NrcellIdentity{
 					Value: &e2sm_mho.BitString{
 						Value: uint64(nci),
-						Len: 36,
+						Len:   36,
 					},
 				},
 			},
@@ -230,7 +237,7 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 	if e2smMhoControlHandler.ControlHeader, err = e2smMhoControlHandler.CreateMhoControlHeader(cellID, cellIDLen, int32(ControlPriority), plmnID); err == nil {
 		if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, ueID, targetCGI); err == nil {
 			if controlRequest, err := e2smMhoControlHandler.CreateMhoControlRequest(); err == nil {
-				log.Debugf("Control Request message for e2NodeID %s: %v", e2NodeID, controlRequest)
+				log.Infof("HO Control Request, imsi:%v, sCell:%v, tCell:%v", ueID, cellID, nci)
 				c.CtrlReqChans[e2NodeID] <- controlRequest
 			}
 		}
