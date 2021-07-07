@@ -5,78 +5,73 @@
 package manager
 
 import (
-	e2tapi "github.com/onosproject/onos-api/go/onos/e2t/e2"
-	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
+	"context"
+
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-lib-go/pkg/northbound"
+	"github.com/onosproject/onos-mho/pkg/broker"
+	appConfig "github.com/onosproject/onos-mho/pkg/config"
 	"github.com/onosproject/onos-mho/pkg/controller"
-	nbi "github.com/onosproject/onos-mho/pkg/northbound"
-	"github.com/onosproject/onos-mho/pkg/southbound/admin"
-	"github.com/onosproject/onos-mho/pkg/southbound/ricapie2"
-	"github.com/onosproject/onos-mho/pkg/store"
+	"github.com/onosproject/onos-mho/pkg/southbound/e2"
+	"github.com/onosproject/onos-mho/pkg/store/metrics"
+	"github.com/onosproject/onos-mho/pkg/uenib"
 	app "github.com/onosproject/onos-ric-sdk-go/pkg/config/app/default"
-	configurable "github.com/onosproject/onos-ric-sdk-go/pkg/config/registry"
-	configutils "github.com/onosproject/onos-ric-sdk-go/pkg/config/utils"
 )
 
 var log = logging.GetLogger("manager")
 
 // Config is a manager configuration
 type Config struct {
-	CAPath        string
-	KeyPath       string
-	CertPath      string
-	E2tEndpoint   string
-	E2SubEndpoint string
-	GRPCPort      int
-	AppConfig     *app.Config
-	RicActionID   int32
+	CAPath      string
+	KeyPath     string
+	CertPath    string
+	ConfigPath  string
+	E2tEndpoint string
+	GRPCPort    int
+	AppConfig   *app.Config
+	SMName      string
+	SMVersion   string
 }
 
 // NewManager creates a new manager
 func NewManager(config Config) *Manager {
-	log.Info("Creating Manager")
-	indCh := make(chan *store.E2NodeIndication)
-	ctrlReqChs := make(map[string]chan *e2tapi.ControlRequest)
-	return &Manager{
-		Config: config,
-		Sessions: SBSessions{
-			AdminSession: admin.NewSession(config.E2tEndpoint),
-			E2Session:    ricapie2.NewSession(config.E2tEndpoint, config.E2SubEndpoint, config.RicActionID, 0),
-		},
-		Chans: Channels{
-			IndCh:      indCh,
-			CtrlReqChs: ctrlReqChs,
-		},
-		Ctrls: Controllers{
-			MhoCtrl: controller.NewMhoController(indCh, ctrlReqChs),
-		},
+	appCfg, err := appConfig.NewConfig()
+	if err != nil {
+		log.Warn(err)
 	}
+	subscriptionBroker := broker.NewBroker()
+	metricStore := metrics.NewStore()
+
+	e2Manager, err := e2.NewManager(
+		e2.WithE2TAddress("onos-e2t", 5150),
+		e2.WithServiceModel(e2.ServiceModelName(config.SMName),
+			e2.ServiceModelVersion(config.SMVersion)),
+		e2.WithAppConfig(appCfg),
+		e2.WithAppID("onos-mho"),
+		e2.WithBroker(subscriptionBroker),
+		e2.WithMetricStore(metricStore))
+
+	if err != nil {
+		log.Warn(err)
+	}
+
+	manager := &Manager{
+		appConfig:   appCfg,
+		config:      config,
+		e2Manager:   e2Manager,
+		mhoCtrl:     controller.NewMhoController(metricStore),
+		uenibClient: uenib.NewUENIBClient(context.Background(), metricStore, config.CertPath, config.KeyPath),
+	}
+	return manager
 }
 
 // Manager is a manager for the MHO xAPP service
 type Manager struct {
-	Config   Config
-	Sessions SBSessions
-	Chans    Channels
-	Ctrls    Controllers
-}
-
-// SBSessions is a set of Southbound sessions
-type SBSessions struct {
-	AdminSession *admin.E2AdminSession
-	E2Session    *ricapie2.E2Session
-}
-
-// Channels is a set of channels
-type Channels struct {
-	IndCh      chan *store.E2NodeIndication
-	CtrlReqChs map[string]chan *e2tapi.ControlRequest
-}
-
-// Controllers is a set of controllers
-type Controllers struct {
-	MhoCtrl *controller.MhoCtrl
+	appConfig   appConfig.Config
+	config      Config
+	e2Manager   e2.Manager
+	mhoCtrl     controller.MhoController
+	uenibClient uenib.Client
 }
 
 // Run starts the manager and the associated services
@@ -95,23 +90,15 @@ func (m *Manager) Start() error {
 		return err
 	}
 
-	// Register the xApp as configurable entity
-	err = m.registerConfigurable()
+	err = m.e2Manager.Start()
 	if err != nil {
-		log.Error("Failed to register the app as a configurable entity", err)
+		log.Warn(err)
 		return err
 	}
 
-	// Fetch config
-	if err = m.getConfig(); err != nil {
-		log.Errorf("Failed to get config: %v", err)
-		return err
-	}
+	m.mhoCtrl.Run(context.Background())
+	m.uenibClient.Run(context.Background())
 
-	m.Sessions.E2Session.AppConfig = m.Config.AppConfig
-
-	go m.Sessions.E2Session.Run(m.Chans.IndCh, m.Chans.CtrlReqChs, m.Sessions.AdminSession)
-	go m.Ctrls.MhoCtrl.Run()
 	return nil
 }
 
@@ -120,26 +107,16 @@ func (m *Manager) Close() {
 	log.Info("Closing Manager")
 }
 
-// registerConfigurable registers the xApp as a configurable entity
-func (m *Manager) registerConfigurable() error {
-	appConfig, err := configurable.RegisterConfigurable(&configurable.RegisterRequest{})
-	if err != nil {
-		return err
-	}
-	m.Config.AppConfig = appConfig.Config.(*app.Config)
-	return nil
-}
-
 func (m *Manager) startNorthboundServer() error {
 	s := northbound.NewServer(northbound.NewServerCfg(
-		m.Config.CAPath,
-		m.Config.KeyPath,
-		m.Config.CertPath,
-		int16(m.Config.GRPCPort),
+		m.config.CAPath,
+		m.config.KeyPath,
+		m.config.CertPath,
+		int16(m.config.GRPCPort),
 		true,
 		northbound.SecurityConfig{}))
 
-	s.AddService(nbi.NewService(m.Ctrls.MhoCtrl))
+	//s.AddService(nbi.NewService(m.Ctrls.mhoCtrl))
 
 	doneCh := make(chan error)
 	go func() {
@@ -152,87 +129,4 @@ func (m *Manager) startNorthboundServer() error {
 		}
 	}()
 	return <-doneCh
-}
-
-func (m *Manager) getConfig() error {
-	if periodicEnabled, err := m.Config.AppConfig.Get(ricapie2.PeriodicEnabledConfigPath); err == nil {
-		m.Sessions.E2Session.Trigger[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC] = periodicEnabled.Value.(bool)
-		if m.Sessions.E2Session.Trigger[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC] {
-			log.Infof("Periodic trigger is enabled")
-			if interval, err := m.Config.AppConfig.Get(ricapie2.ReportPeriodConfigPath); err == nil {
-				if val, err := configutils.ToUint64(interval.Value); err == nil {
-					m.Sessions.E2Session.ReportPeriodMs = val
-					log.Infof("ReportPeriodMs: %v", m.Sessions.E2Session.ReportPeriodMs)
-				}
-			} else {
-				return err
-			}
-		} else {
-			m.Sessions.E2Session.ReportPeriodMs = 0
-		}
-	} else {
-		return err
-	}
-
-	if uponRcvMeasReportEnabled, err := m.Config.AppConfig.Get(ricapie2.UponRcvMeasReportEnabledConfigPath); err == nil {
-		m.Sessions.E2Session.Trigger[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT] = uponRcvMeasReportEnabled.Value.(bool)
-		log.Info("UponRcvMeasReport trigger is enabled")
-	} else {
-		return err
-	}
-
-	if uponChangeRrcStatusEnabled, err := m.Config.AppConfig.Get(ricapie2.UponChangeRrcStatusEnabledConfigPath); err == nil {
-		m.Sessions.E2Session.Trigger[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_CHANGE_RRC_STATUS] = uponChangeRrcStatusEnabled.Value.(bool)
-		log.Info("UponChangeRrcStatus trigger is enabled")
-	} else {
-		return err
-	}
-
-	if a3OffsetRange, err := m.Config.AppConfig.Get(controller.A3OffsetRangeConfigPath); err == nil {
-		if m.Ctrls.MhoCtrl.HoCtrl.A3OffsetRange, err = configutils.ToUint64(a3OffsetRange.Value); err != nil {
-			return err
-		}
-		log.Infof("A3OffsetRange: %v", m.Ctrls.MhoCtrl.HoCtrl.A3OffsetRange)
-	} else {
-		return err
-	}
-
-	if hysteresisRange, err := m.Config.AppConfig.Get(controller.HysteresisRangeConfigPath); err == nil {
-		if m.Ctrls.MhoCtrl.HoCtrl.HysteresisRange, err = configutils.ToUint64(hysteresisRange.Value); err != nil {
-			return err
-		}
-		log.Infof("HysteresisRange: %v", m.Ctrls.MhoCtrl.HoCtrl.HysteresisRange)
-	} else {
-		return err
-	}
-
-	if cellIndividualOffset, err := m.Config.AppConfig.Get(controller.CellIndividualOffsetConfigPath); err == nil {
-		if m.Ctrls.MhoCtrl.HoCtrl.CellIndividualOffset, err = configutils.ToUint64(cellIndividualOffset.Value); err != nil {
-			return err
-		}
-		log.Infof("CellIndividualOffset: %v", m.Ctrls.MhoCtrl.HoCtrl.CellIndividualOffset)
-	} else {
-		return err
-	}
-
-	if frequencyOffset, err := m.Config.AppConfig.Get(controller.FrequencyOffsetConfigPath); err == nil {
-		if m.Ctrls.MhoCtrl.HoCtrl.FrequencyOffset, err = configutils.ToUint64(frequencyOffset.Value); err != nil {
-			return err
-		}
-		log.Infof("FrequencyOffset: %v", m.Ctrls.MhoCtrl.HoCtrl.FrequencyOffset)
-	} else {
-		return err
-	}
-
-	if timeToTrigger, err := m.Config.AppConfig.Get(controller.TimeToTriggerConfigPath); err == nil {
-		if m.Ctrls.MhoCtrl.HoCtrl.TimeToTrigger, err = configutils.ToUint64(timeToTrigger.Value); err != nil {
-			return err
-		}
-		log.Infof("TimeToTrigger: %v", m.Ctrls.MhoCtrl.HoCtrl.TimeToTrigger)
-	} else {
-		return err
-	}
-
-	return nil
-
 }
