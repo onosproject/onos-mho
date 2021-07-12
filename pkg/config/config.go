@@ -10,7 +10,6 @@ import (
 	configurable "github.com/onosproject/onos-ric-sdk-go/pkg/config/registry"
 
 	"github.com/onosproject/onos-lib-go/pkg/logging"
-	"github.com/onosproject/onos-mho/pkg/utils"
 	app "github.com/onosproject/onos-ric-sdk-go/pkg/config/app/default"
 	"github.com/onosproject/onos-ric-sdk-go/pkg/config/event"
 	configutils "github.com/onosproject/onos-ric-sdk-go/pkg/config/utils"
@@ -20,11 +19,21 @@ var log = logging.GetLogger("config")
 
 const defaultConfigPath = "/etc/onos/config/config.json"
 
+const (
+	ReportingPeriodConfigPath = "reportingPeriod"
+	PeriodicConfigPath = "periodic"
+	UponRcvMeasConfigPath = "uponRcvMeasReport"
+	UponChangeRrcStatusConfigPath = "uponChangeRrcStatus"
+	A3OffsetRangeConfigPath        = "A3OffsetRange"
+	HysteresisRangeConfigPath      = "HysteresisRange"
+	CellIndividualOffsetConfigPath = "CellIndividualOffset"
+	FrequencyOffsetConfigPath      = "FrequencyOffset"
+	TimeToTriggerConfigPath        = "TimeToTrigger"
+)
+
 // Config xApp configuration interface
 type Config interface {
-	GetReportPeriodWithPath(path string) (uint64, error)
-	GetReportPeriod() (uint64, error)
-	GetGranularityPeriod() (uint64, error)
+	GetReportingPeriod() (uint64, error)
 	Watch(context.Context, chan event.Event) error
 }
 
@@ -55,38 +64,19 @@ func (c *AppConfig) Watch(ctx context.Context, ch chan event.Event) error {
 	return nil
 }
 
-// GetReportPeriodWithPath gets report period with a given path
-func (c *AppConfig) GetReportPeriodWithPath(path string) (uint64, error) {
-	interval, _ := c.appConfig.Get(path)
+// GetReportingPeriod gets configured reporting period
+func (c *AppConfig) GetReportingPeriod() (uint64, error) {
+	interval, err := c.appConfig.Get(ReportingPeriodConfigPath)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
 	val, err := configutils.ToUint64(interval.Value)
 	if err != nil {
 		log.Error(err)
 		return 0, err
 	}
 
-	return val, nil
-}
-
-// GetReportPeriod gets report period
-func (c *AppConfig) GetReportPeriod() (uint64, error) {
-	interval, _ := c.appConfig.Get(utils.ReportPeriodConfigPath)
-	val, err := configutils.ToUint64(interval.Value)
-	if err != nil {
-		log.Error(err)
-		return 0, err
-	}
-
-	return val, nil
-}
-
-// GetGranularityPeriod gets granularity period
-func (c *AppConfig) GetGranularityPeriod() (uint64, error) {
-	granularity, _ := c.appConfig.Get(utils.GranularityPeriodConfigPath)
-	val, err := configutils.ToUint64(granularity.Value)
-	if err != nil {
-		log.Error(err)
-		return 0, err
-	}
 	return val, nil
 }
 

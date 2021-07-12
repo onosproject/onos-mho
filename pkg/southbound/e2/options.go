@@ -5,8 +5,10 @@
 package e2
 
 import (
+	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	"github.com/onosproject/onos-mho/pkg/broker"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
+	"github.com/onosproject/onos-mho/pkg/controller"
 	"github.com/onosproject/onos-mho/pkg/store/metrics"
 )
 
@@ -30,6 +32,10 @@ type AppOptions struct {
 	Broker broker.Broker
 
 	MetricStore metrics.Store
+
+	IndCh chan *controller.E2NodeIndication
+
+	CtrlReqChs map[string]chan *e2api.ControlMessage
 }
 
 // E2TServiceOptions are the options for a E2T service
@@ -161,5 +167,19 @@ func WithBroker(broker broker.Broker) Option {
 func WithMetricStore(metricStore metrics.Store) Option {
 	return newOption(func(options *Options) {
 		options.App.MetricStore = metricStore
+	})
+}
+
+// WithIndChan ...
+func WithIndChan(indCh chan *controller.E2NodeIndication) Option {
+	return newOption(func(options *Options) {
+		options.App.IndCh = indCh
+	})
+}
+
+// WithCtrlReqChs ...
+func WithCtrlReqChs(ctrlReqChs map[string]chan *e2api.ControlMessage) Option {
+	return newOption(func(options *Options) {
+		options.App.CtrlReqChs = ctrlReqChs
 	})
 }

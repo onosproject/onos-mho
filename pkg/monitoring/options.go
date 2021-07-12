@@ -8,6 +8,7 @@ import (
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
 	"github.com/onosproject/onos-mho/pkg/broker"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
+	"github.com/onosproject/onos-mho/pkg/controller"
 	"github.com/onosproject/onos-mho/pkg/rnib"
 	"github.com/onosproject/onos-mho/pkg/store/metrics"
 
@@ -28,6 +29,8 @@ type AppOptions struct {
 	MetricStore metrics.Store
 
 	RNIBClient rnib.Client
+
+	IndCh chan *controller.E2NodeIndication
 }
 
 // MonitorOptions monitoring options
@@ -96,5 +99,11 @@ func WithMetricStore(metricsStore metrics.Store) Option {
 func WithRNIBClient(rnibClient rnib.Client) Option {
 	return newOption(func(options *Options) {
 		options.App.RNIBClient = rnibClient
+	})
+}
+
+func WithIndChan(indCh chan *controller.E2NodeIndication) Option {
+	return newOption(func(options *Options) {
+		options.App.IndCh = indCh
 	})
 }

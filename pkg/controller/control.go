@@ -6,6 +6,7 @@ package controller
 
 import (
 	e2tapi "github.com/onosproject/onos-api/go/onos/e2t/e2"
+	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/pdubuilder"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"google.golang.org/protobuf/proto"
@@ -21,21 +22,11 @@ type E2SmMhoControlHandler struct {
 	EncodingType        e2tapi.EncodingType
 }
 
-func (c *E2SmMhoControlHandler) CreateMhoControlRequest() (*e2tapi.ControlRequest, error) {
-	controlRequest := &e2tapi.ControlRequest{
-		E2NodeID: e2tapi.E2NodeID(c.NodeID),
-		Header: &e2tapi.RequestHeader{
-			EncodingType: c.EncodingType,
-			ServiceModel: &e2tapi.ServiceModel{
-				Name:    c.ServiceModelName,
-				Version: c.ServiceModelVersion,
-			},
-		},
-		ControlAckRequest: c.ControlAckRequest,
-		ControlHeader:     c.ControlHeader,
-		ControlMessage:    c.ControlMessage,
-	}
-	return controlRequest, nil
+func (c *E2SmMhoControlHandler) CreateMhoControlRequest() (*e2api.ControlMessage, error) {
+	return &e2api.ControlMessage{
+		Header: c.ControlHeader,
+		Payload: c.ControlMessage,
+		}, nil
 }
 
 func (c *E2SmMhoControlHandler) CreateMhoControlHeader(cellID uint64, cellIDLen uint32, priority int32, plmnID []byte) ([]byte, error) {

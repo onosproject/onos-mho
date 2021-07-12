@@ -6,6 +6,7 @@ package monitoring
 
 import (
 	"context"
+	"github.com/onosproject/onos-mho/pkg/controller"
 	"github.com/onosproject/onos-mho/pkg/rnib"
 
 	"github.com/onosproject/onos-mho/pkg/store/metrics"
@@ -17,9 +18,14 @@ import (
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
 
 	"github.com/onosproject/onos-mho/pkg/broker"
+
+	"github.com/onosproject/onos-lib-go/pkg/logging"
+
+	e2ind "github.com/onosproject/onos-ric-sdk-go/pkg/e2/indication"
+
 )
 
-//var log = logging.GetLogger("monitoring")
+var log = logging.GetLogger("monitoring")
 
 // NewMonitor creates a new indication monitor
 func NewMonitor(opts ...Option) *Monitor {
@@ -34,6 +40,7 @@ func NewMonitor(opts ...Option) *Monitor {
 		metricStore:  options.App.MetricStore,
 		nodeID:       options.Monitor.NodeID,
 		rnibClient:   options.App.RNIBClient,
+		indChan: options.App.IndCh,
 	}
 }
 
@@ -44,14 +51,21 @@ type Monitor struct {
 	metricStore  metrics.Store
 	nodeID       topoapi.ID
 	rnibClient   rnib.Client
+	indChan      chan *controller.E2NodeIndication
 }
 
 func (m *Monitor) processIndication(ctx context.Context, indication e2api.Indication, nodeID topoapi.ID) error {
-	//err := m.processIndicationFormat1(ctx, indication, nodeID)
-	//if err != nil {
-	//	log.Warn(err)
-	//	return err
-	//}
+	log.Debugf("processIndication, nodeID: %v, indication: %v ", nodeID, indication)
+
+	m.indChan <- &controller.E2NodeIndication{
+		NodeID: string(nodeID),
+		IndMsg: e2ind.Indication{
+			Payload: e2ind.Payload{
+				Header: indication.Header,
+				Message: indication.Payload,
+			},
+		},
+	}
 
 	return nil
 }
@@ -62,11 +76,14 @@ func (m *Monitor) Start(ctx context.Context) error {
 	go func() {
 		for {
 			indMsg, err := m.streamReader.Recv(ctx)
+			log.Debugf("shad Monitor indMsg: %v", indMsg)
 			if err != nil {
+				log.Errorf("Error reading indication stream, chanID:%v, streamID:%v, err:%v", m.streamReader.ChannelID(), m.streamReader.StreamID(), err)
 				errCh <- err
 			}
 			err = m.processIndication(ctx, indMsg, m.nodeID)
 			if err != nil {
+				log.Errorf("Error processing indication, err:%v", err)
 				errCh <- err
 			}
 		}

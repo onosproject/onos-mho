@@ -6,7 +6,7 @@ package manager
 
 import (
 	"context"
-
+	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-lib-go/pkg/northbound"
 	"github.com/onosproject/onos-mho/pkg/broker"
@@ -42,6 +42,9 @@ func NewManager(config Config) *Manager {
 	subscriptionBroker := broker.NewBroker()
 	metricStore := metrics.NewStore()
 
+	indCh := make(chan *controller.E2NodeIndication)
+	ctrlReqChs := make(map[string]chan *e2api.ControlMessage)
+
 	e2Manager, err := e2.NewManager(
 		e2.WithE2TAddress("onos-e2t", 5150),
 		e2.WithServiceModel(e2.ServiceModelName(config.SMName),
@@ -49,7 +52,9 @@ func NewManager(config Config) *Manager {
 		e2.WithAppConfig(appCfg),
 		e2.WithAppID("onos-mho"),
 		e2.WithBroker(subscriptionBroker),
-		e2.WithMetricStore(metricStore))
+		e2.WithMetricStore(metricStore),
+		e2.WithIndChan(indCh),
+		e2.WithCtrlReqChs(ctrlReqChs))
 
 	if err != nil {
 		log.Warn(err)
@@ -59,7 +64,7 @@ func NewManager(config Config) *Manager {
 		appConfig:   appCfg,
 		config:      config,
 		e2Manager:   e2Manager,
-		mhoCtrl:     controller.NewMhoController(metricStore),
+		mhoCtrl:     controller.NewMhoController(indCh, ctrlReqChs),
 		uenibClient: uenib.NewUENIBClient(context.Background(), metricStore, config.CertPath, config.KeyPath),
 	}
 	return manager
@@ -70,7 +75,7 @@ type Manager struct {
 	appConfig   appConfig.Config
 	config      Config
 	e2Manager   e2.Manager
-	mhoCtrl     controller.MhoController
+	mhoCtrl     *controller.MhoCtrl
 	uenibClient uenib.Client
 }
 
