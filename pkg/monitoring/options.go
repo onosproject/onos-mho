@@ -10,7 +10,6 @@ import (
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
 	"github.com/onosproject/onos-mho/pkg/controller"
 	"github.com/onosproject/onos-mho/pkg/rnib"
-	"github.com/onosproject/onos-mho/pkg/store/metrics"
 
 	e2client "github.com/onosproject/onos-ric-sdk-go/pkg/e2/v1beta1"
 )
@@ -25,8 +24,6 @@ type Options struct {
 // AppOptions application options
 type AppOptions struct {
 	AppConfig *appConfig.AppConfig
-
-	MetricStore metrics.Store
 
 	RNIBClient rnib.Client
 
@@ -85,13 +82,6 @@ func WithNode(node e2client.Node) Option {
 func WithAppConfig(appConfig *appConfig.AppConfig) Option {
 	return newOption(func(options *Options) {
 		options.App.AppConfig = appConfig
-	})
-}
-
-// WithMetricStore sets metrics store
-func WithMetricStore(metricsStore metrics.Store) Option {
-	return newOption(func(options *Options) {
-		options.App.MetricStore = metricsStore
 	})
 }
 

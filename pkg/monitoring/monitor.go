@@ -9,8 +9,6 @@ import (
 	"github.com/onosproject/onos-mho/pkg/controller"
 	"github.com/onosproject/onos-mho/pkg/rnib"
 
-	"github.com/onosproject/onos-mho/pkg/store/metrics"
-
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
@@ -37,7 +35,6 @@ func NewMonitor(opts ...Option) *Monitor {
 	return &Monitor{
 		streamReader: options.Monitor.StreamReader,
 		appConfig:    options.App.AppConfig,
-		metricStore:  options.App.MetricStore,
 		nodeID:       options.Monitor.NodeID,
 		rnibClient:   options.App.RNIBClient,
 		indChan: options.App.IndCh,
@@ -48,7 +45,6 @@ func NewMonitor(opts ...Option) *Monitor {
 type Monitor struct {
 	streamReader broker.StreamReader
 	appConfig    *appConfig.AppConfig
-	metricStore  metrics.Store
 	nodeID       topoapi.ID
 	rnibClient   rnib.Client
 	indChan      chan *controller.E2NodeIndication

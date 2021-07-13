@@ -15,8 +15,6 @@ import (
 
 	//"github.com/onosproject/onos-mho/pkg/utils/control"
 
-	"github.com/onosproject/onos-mho/pkg/store/metrics"
-
 	prototypes "github.com/gogo/protobuf/types"
 	"github.com/onosproject/onos-lib-go/pkg/errors"
 
@@ -69,7 +67,6 @@ type Manager struct {
 	serviceModel ServiceModelOptions
 	appConfig    *appConfig.AppConfig
 	streams      broker.Broker
-	metricStore  metrics.Store
 	indChan      chan *controller.E2NodeIndication
 	CtrlReqChs map[string]chan *e2api.ControlMessage
 }
@@ -104,7 +101,6 @@ func NewManager(opts ...Option) (Manager, error) {
 		},
 		appConfig:   options.App.AppConfig,
 		streams:     options.App.Broker,
-		metricStore: options.App.MetricStore,
 		indChan: options.App.IndCh,
 		CtrlReqChs: options.App.CtrlReqChs,
 	}, nil
@@ -205,7 +201,6 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID) e
 
 	go m.sendIndicationOnStream(streamReader.StreamID(), ch)
 	monitor := monitoring.NewMonitor(monitoring.WithAppConfig(m.appConfig),
-		monitoring.WithMetricStore(m.metricStore),
 		monitoring.WithNode(node),
 		monitoring.WithStreamReader(streamReader),
 		monitoring.WithNodeID(e2nodeID),

@@ -13,8 +13,6 @@ import (
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
 	"github.com/onosproject/onos-mho/pkg/controller"
 	"github.com/onosproject/onos-mho/pkg/southbound/e2"
-	"github.com/onosproject/onos-mho/pkg/store/metrics"
-	"github.com/onosproject/onos-mho/pkg/uenib"
 	app "github.com/onosproject/onos-ric-sdk-go/pkg/config/app/default"
 )
 
@@ -40,7 +38,6 @@ func NewManager(config Config) *Manager {
 		log.Warn(err)
 	}
 	subscriptionBroker := broker.NewBroker()
-	metricStore := metrics.NewStore()
 
 	indCh := make(chan *controller.E2NodeIndication)
 	ctrlReqChs := make(map[string]chan *e2api.ControlMessage)
@@ -52,7 +49,6 @@ func NewManager(config Config) *Manager {
 		e2.WithAppConfig(appCfg),
 		e2.WithAppID("onos-mho"),
 		e2.WithBroker(subscriptionBroker),
-		e2.WithMetricStore(metricStore),
 		e2.WithIndChan(indCh),
 		e2.WithCtrlReqChs(ctrlReqChs))
 
@@ -65,7 +61,6 @@ func NewManager(config Config) *Manager {
 		config:      config,
 		e2Manager:   e2Manager,
 		mhoCtrl:     controller.NewMhoController(indCh, ctrlReqChs),
-		uenibClient: uenib.NewUENIBClient(context.Background(), metricStore, config.CertPath, config.KeyPath),
 	}
 	return manager
 }
@@ -76,7 +71,6 @@ type Manager struct {
 	config      Config
 	e2Manager   e2.Manager
 	mhoCtrl     *controller.MhoCtrl
-	uenibClient uenib.Client
 }
 
 // Run starts the manager and the associated services
@@ -102,7 +96,6 @@ func (m *Manager) Start() error {
 	}
 
 	m.mhoCtrl.Run(context.Background())
-	m.uenibClient.Run(context.Background())
 
 	return nil
 }

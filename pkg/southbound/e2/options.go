@@ -9,7 +9,6 @@ import (
 	"github.com/onosproject/onos-mho/pkg/broker"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
 	"github.com/onosproject/onos-mho/pkg/controller"
-	"github.com/onosproject/onos-mho/pkg/store/metrics"
 )
 
 // Options E2 client options
@@ -30,8 +29,6 @@ type AppOptions struct {
 	AppConfig *appConfig.AppConfig
 
 	Broker broker.Broker
-
-	MetricStore metrics.Store
 
 	IndCh chan *controller.E2NodeIndication
 
@@ -160,13 +157,6 @@ func WithAppConfig(appConfig *appConfig.AppConfig) Option {
 func WithBroker(broker broker.Broker) Option {
 	return newOption(func(options *Options) {
 		options.App.Broker = broker
-	})
-}
-
-// WithMetricStore sets metric store
-func WithMetricStore(metricStore metrics.Store) Option {
-	return newOption(func(options *Options) {
-		options.App.MetricStore = metricStore
 	})
 }
 
