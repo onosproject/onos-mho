@@ -132,7 +132,6 @@ func (m *Manager) sendIndicationOnStream(streamID broker.StreamID, ch chan e2api
 	}
 
 	for msg := range ch {
-		log.Debugf("shad sendIndicationOnStream msg: %v", msg)
 		err := streamWriter.Send(msg)
 		if err != nil {
 			log.Warn(err)
@@ -270,7 +269,6 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 func (m *Manager) watchMHOChanges(ctx context.Context, e2nodeID topoapi.ID) {
 
 	for ctrlReqMsg := range m.CtrlReqChs[string(e2nodeID)] {
-		log.Infof("E2Node: %v - Raw message: %v", e2nodeID, e2nodeID, ctrlReqMsg)
 		//if string(ctrlReqMsg.E2NodeID) != string(e2nodeID) {
 		//	log.Errorf("E2Node ID does not match: E2Node ID E2Session - %v; E2Node ID in Ctrl Message - %v", e2nodeID, ctrlReqMsg.E2NodeID)
 		//	return

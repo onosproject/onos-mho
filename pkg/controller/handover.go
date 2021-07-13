@@ -45,7 +45,6 @@ func (h *HandOverController) Run() {
 	go h.HandoverHandler.Run()
 
 	for ue := range h.A3Handler.Chans.OutputChan {
-		log.Debugf("shad HandOverController ue: %v", ue)
 		h.HandoverHandler.Chans.InputChan <- ue
 	}
 

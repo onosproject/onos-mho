@@ -137,13 +137,21 @@ func (c *MhoCtrl) handleIndMsgFormat1(header *e2sm_mho.E2SmMhoIndicationHeaderFo
 			measSCellFound = true
 		} else {
 			ecgiCSCell := id.NewECGI(measReport.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
+			// TODO
+			//cscell := device.NewCell(
+			//	ecgiCSCell,
+			//	meastype.A3OffsetRange(c.HoCtrl.A3OffsetRange),
+			//	meastype.HysteresisRange(c.HoCtrl.HysteresisRange),
+			//	meastype.QOffsetRange(c.HoCtrl.CellIndividualOffset),
+			//	meastype.QOffsetRange(c.HoCtrl.FrequencyOffset),
+			//	meastype.TimeToTriggerRange(c.HoCtrl.TimeToTrigger))
 			cscell := device.NewCell(
 				ecgiCSCell,
-				meastype.A3OffsetRange(c.HoCtrl.A3OffsetRange),
-				meastype.HysteresisRange(c.HoCtrl.HysteresisRange),
-				meastype.QOffsetRange(c.HoCtrl.CellIndividualOffset),
-				meastype.QOffsetRange(c.HoCtrl.FrequencyOffset),
-				meastype.TimeToTriggerRange(c.HoCtrl.TimeToTrigger))
+				meastype.A3OffsetRange(1),
+				meastype.HysteresisRange(2),
+				meastype.QOffsetRange(18),
+				meastype.QOffsetRange(19),
+				meastype.TimeToTriggerRange(0))
 			cscellList = append(cscellList, cscell)
 			ue.GetMeasurements()[ecgiCSCell.String()] = measurement.NewMeasEventA3(ecgiCSCell, measurement.RSRP(measReport.GetRsrp().GetValue()))
 		}
@@ -166,7 +174,6 @@ func (c *MhoCtrl) handleIndMsgFormat1(header *e2sm_mho.E2SmMhoIndicationHeaderFo
 
 	ue.SetCSCells(cscellList)
 	c.cacheUE(ue.GetID(), header, message, e2NodeID)
-	log.Debugf("shad handleIndMsgFormat1 ue: %v", ue)
 	c.HoCtrl.A3Handler.Chans.InputChan <- ue
 
 }
@@ -244,7 +251,6 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 	if e2smMhoControlHandler.ControlHeader, err = e2smMhoControlHandler.CreateMhoControlHeader(cellID, cellIDLen, int32(ControlPriority), plmnID); err == nil {
 		if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, ueID, targetCGI); err == nil {
 			if controlRequest, err := e2smMhoControlHandler.CreateMhoControlRequest(); err == nil {
-				log.Infof("HO Control Request, imsi:%v, sCell:%v, tCell:%v", ueID, cellID, nci)
 				c.CtrlReqChans[e2NodeID] <- controlRequest
 			}
 		}

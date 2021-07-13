@@ -76,7 +76,6 @@ func (m *Monitor) Start(ctx context.Context) error {
 	go func() {
 		for {
 			indMsg, err := m.streamReader.Recv(ctx)
-			log.Debugf("shad Monitor indMsg: %v", indMsg)
 			if err != nil {
 				log.Errorf("Error reading indication stream, chanID:%v, streamID:%v, err:%v", m.streamReader.ChannelID(), m.streamReader.StreamID(), err)
 				errCh <- err
