@@ -252,6 +252,7 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 		if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, ueID, targetCGI); err == nil {
 			if controlRequest, err := e2smMhoControlHandler.CreateMhoControlRequest(); err == nil {
 				c.CtrlReqChans[e2NodeID] <- controlRequest
+				log.Infof("HO request queued to control channel, e2NodeID:%v, ueID:%v", e2NodeID, ueID)
 			}
 		}
 	}

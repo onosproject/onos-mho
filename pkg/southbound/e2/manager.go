@@ -272,9 +272,9 @@ func (m *Manager) watchMHOChanges(ctx context.Context, e2nodeID topoapi.ID) {
 		// TODO
 		ctrlRespMsg, err := node.Control(ctx, ctrlReqMsg)
 		if err != nil {
-			log.Errorf("Failed to send control message - %v", err)
+			log.Warnf("Error sending control message - %v", err)
 		} else if ctrlRespMsg == nil {
-			log.Errorf("Control response message is nil")
+			log.Debugf("Control response message is nil")
 		}
 	}
 }
@@ -282,6 +282,7 @@ func (m *Manager) watchMHOChanges(ctx context.Context, e2nodeID topoapi.ID) {
 func (m *Manager) createEventTriggerOnChange() ([]byte, error) {
 	var reportPeriodMs int32
 	// TODO
+	//triggerType := e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT
 	triggerType := e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC
 	reportingPeriod, err := m.appConfig.GetReportingPeriod()
 	if err != nil {
