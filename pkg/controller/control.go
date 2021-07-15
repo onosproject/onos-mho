@@ -14,12 +14,9 @@ import (
 
 type E2SmMhoControlHandler struct {
 	NodeID              string
-	ServiceModelName    e2tapi.ServiceModelName
-	ServiceModelVersion e2tapi.ServiceModelVersion
 	ControlMessage      []byte
 	ControlHeader       []byte
 	ControlAckRequest   e2tapi.ControlAckRequest
-	EncodingType        e2tapi.EncodingType
 }
 
 func (c *E2SmMhoControlHandler) CreateMhoControlRequest() (*e2api.ControlMessage, error) {

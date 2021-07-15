@@ -230,9 +230,6 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 
 	e2smMhoControlHandler := &E2SmMhoControlHandler{
 		NodeID:              e2NodeID,
-		EncodingType:        e2tapi.EncodingType_PROTO,
-		//ServiceModelName:    ricapie2.ServiceModelName,
-		//ServiceModelVersion: ricapie2.ServiceModelVersion,
 		ControlAckRequest:   e2tapi.ControlAckRequest_NO_ACK,
 	}
 
