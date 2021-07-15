@@ -44,7 +44,6 @@ func (h *HandOverController) Run() {
 
 	go h.HandoverHandler.Run()
 
-	// forward event a3 measurement only to handover handler
 	for ue := range h.A3Handler.Chans.OutputChan {
 		h.HandoverHandler.Chans.InputChan <- ue
 	}
