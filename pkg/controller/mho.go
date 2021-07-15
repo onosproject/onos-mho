@@ -105,11 +105,11 @@ func (c *MhoCtrl) listenIndChan() {
 func (c *MhoCtrl) listenHandOver() {
 	for hoDecision := range c.HoCtrl.HandoverHandler.Chans.OutputChan {
 		log.Debugf("TRACE: listenHandOver(), Got a HO decision")
-		go func() {
+		go func(hoDecision handover.A3HandoverDecision) {
 			if err := c.control(hoDecision); err != nil {
 				log.Error(err)
 			}
-		}()
+		}(hoDecision)
 	}
 }
 

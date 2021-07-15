@@ -270,7 +270,7 @@ func (m *Manager) watchMHOChanges(ctx context.Context, e2nodeID topoapi.ID) {
 		//	log.Errorf("E2Node ID does not match: E2Node ID E2Session - %v; E2Node ID in Ctrl Message - %v", e2nodeID, ctrlReqMsg.E2NodeID)
 		//	return
 		//}
-		go func() {
+		go func(ctrlReqMsg *e2api.ControlMessage) {
 			log.Debugf("TRACE: watchMHOChanges() SENDING e2NodeID:%v, chan:%v", e2nodeID, m.CtrlReqChs[string(e2nodeID)])
 			node := m.e2client.Node(e2client.NodeID(e2nodeID))
 			ctrlRespMsg, err := node.Control(ctx, ctrlReqMsg)
@@ -280,7 +280,7 @@ func (m *Manager) watchMHOChanges(ctx context.Context, e2nodeID topoapi.ID) {
 				log.Debugf("Control response message is nil")
 			}
 			log.Debugf("TRACE: watchMHOChanges() SENT e2NodeID:%v, chan:%v", e2nodeID, m.CtrlReqChs[string(e2nodeID)])
-		}()
+		}(ctrlReqMsg)
 	}
 }
 
