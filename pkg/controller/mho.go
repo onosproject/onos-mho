@@ -86,9 +86,11 @@ func (c *MhoCtrl) listenIndChan() {
 				log.Debugf("MHO indication message: %v", indMessage.GetIndicationMessageFormat1())
 				switch x := indMessage.E2SmMhoIndicationMessage.(type) {
 				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat1:
-					c.handleIndMsgFormat1(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+					log.Debug("TRACE: listenIndChan() go handleIndMsgFormat1")
+					go c.handleIndMsgFormat1(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
 				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat2:
-					c.handleIndMsgFormat2(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+					log.Debug("TRACE: listenIndChan() go handleIndMsgFormat2")
+					go c.handleIndMsgFormat2(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
 				default:
 					log.Warnf("Unknown MHO indication message format, indication message: %v", x)
 				}
@@ -102,14 +104,18 @@ func (c *MhoCtrl) listenIndChan() {
 
 func (c *MhoCtrl) listenHandOver() {
 	for hoDecision := range c.HoCtrl.HandoverHandler.Chans.OutputChan {
-		if err := c.control(hoDecision); err != nil {
-			log.Error(err)
-		}
+		log.Debugf("TRACE: listenHandOver(), Got a HO decision")
+		go func() {
+			if err := c.control(hoDecision); err != nil {
+				log.Error(err)
+			}
+		}()
 	}
 }
 
 //*E2SmMhoIndicationMessageFormat1
 func (c *MhoCtrl) handleIndMsgFormat1(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+	log.Debug("TRACE: handleIndMsgFormat1()")
 
 	imsi, err := strconv.Atoi(message.GetUeId().GetValue())
 	if err != nil {
@@ -174,7 +180,9 @@ func (c *MhoCtrl) handleIndMsgFormat1(header *e2sm_mho.E2SmMhoIndicationHeaderFo
 
 	ue.SetCSCells(cscellList)
 	c.cacheUE(ue.GetID(), header, message, e2NodeID)
+	log.Debugf("TRACE: handleIndMsgFormat1() Queueing UE to A3 handler, ueID:%v", imsi)
 	c.HoCtrl.A3Handler.Chans.InputChan <- ue
+	log.Debugf("TRACE: handleIndMsgFormat1() Queued UE to A3 handler, ueID:%v", imsi)
 
 }
 
@@ -248,14 +256,17 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 		},
 	}
 
-	if e2smMhoControlHandler.ControlHeader, err = e2smMhoControlHandler.CreateMhoControlHeader(cellID, cellIDLen, int32(ControlPriority), plmnID); err == nil {
-		if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, ueID, targetCGI); err == nil {
-			if controlRequest, err := e2smMhoControlHandler.CreateMhoControlRequest(); err == nil {
-				c.CtrlReqChans[e2NodeID] <- controlRequest
-				log.Infof("HO request queued to control channel, e2NodeID:%v, ueID:%v", e2NodeID, ueID)
+	go func() {
+		if e2smMhoControlHandler.ControlHeader, err = e2smMhoControlHandler.CreateMhoControlHeader(cellID, cellIDLen, int32(ControlPriority), plmnID); err == nil {
+			if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, ueID, targetCGI); err == nil {
+				if controlRequest, err := e2smMhoControlHandler.CreateMhoControlRequest(); err == nil {
+					log.Infof("TRACE: Queuing HO request to control channel, e2NodeID:%v, ueID:%v, chan:%v", e2NodeID, ueID, c.CtrlReqChans[e2NodeID])
+					c.CtrlReqChans[e2NodeID] <- controlRequest
+					log.Infof("TRACE: Queued HO request to control channel, e2NodeID:%v, ueID:%v, chan:%v", e2NodeID, ueID, c.CtrlReqChans[e2NodeID])
+				}
 			}
 		}
-	}
+	}()
 
 	return err
 
