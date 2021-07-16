@@ -9,7 +9,6 @@ COPY Makefile go.mod go.sum /go/src/github.com/onosproject/onos-mho/
 COPY cmd/ /go/src/github.com/onosproject/onos-mho/cmd/
 COPY pkg/ /go/src/github.com/onosproject/onos-mho/pkg/
 COPY vendor/ /go/src/github.com/onosproject/onos-mho/vendor/
-COPY api/ /go/src/github.com/onosproject/onos-mho/api
 
 RUN cd /go/src/github.com/onosproject/onos-mho && GOFLAGS=-mod=vendor make ${ONOS_MAKE_TARGET}
 
