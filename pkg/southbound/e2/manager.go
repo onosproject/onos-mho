@@ -6,10 +6,10 @@ package e2
 
 import (
 	"context"
+	"fmt"
 	"github.com/onosproject/onos-mho/pkg/controller"
 	"google.golang.org/protobuf/proto"
 	"strings"
-	"time"
 
 	"github.com/onosproject/onos-mho/pkg/monitoring"
 
@@ -18,7 +18,6 @@ import (
 	prototypes "github.com/gogo/protobuf/types"
 	"github.com/onosproject/onos-lib-go/pkg/errors"
 
-	"github.com/cenkalti/backoff/v4"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 
 	"github.com/onosproject/onos-mho/pkg/broker"
@@ -38,21 +37,6 @@ var log = logging.GetLogger("e2", "subscription", "manager")
 const (
 	oid = "1.3.6.1.4.1.53148.1.1.2.101"
 )
-
-const (
-	backoffInterval = 10 * time.Millisecond
-	maxBackoffTime  = 5 * time.Second
-)
-
-func newExpBackoff() *backoff.ExponentialBackOff {
-	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = backoffInterval
-	// MaxInterval caps the RetryInterval
-	b.MaxInterval = maxBackoffTime
-	// Never stops retrying
-	b.MaxElapsedTime = 0
-	return b
-}
 
 // Node e2 manager interface
 type Node interface {
@@ -122,7 +106,6 @@ func (m *Manager) Start() error {
 }
 
 func (m *Manager) sendIndicationOnStream(streamID broker.StreamID, ch chan e2api.Indication) {
-	log.Debugf("TRACE: sendIndicationOnStream, %v, %v", streamID, ch)
 	streamWriter, err := m.streams.GetWriter(streamID)
 	if err != nil {
 		log.Error(err)
@@ -139,7 +122,6 @@ func (m *Manager) sendIndicationOnStream(streamID broker.StreamID, ch chan e2api
 }
 
 func (m *Manager) getRanFunction(serviceModelsInfo map[string]*topoapi.ServiceModelInfo) (*topoapi.MHORanFunction, error) {
-	log.Info("Service models:", serviceModelsInfo)
 	for _, sm := range serviceModelsInfo {
 		smName := strings.ToLower(sm.Name)
 		if smName == string(m.serviceModel.Name) && sm.OID == oid {
@@ -160,7 +142,6 @@ func (m *Manager) getRanFunction(serviceModelsInfo map[string]*topoapi.ServiceMo
 }
 
 func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, triggerType e2sm_mho.MhoTriggerType) error {
-	log.Infof("Creating MHO subscription for e2NodeID: %v, triggerType:%v", e2nodeID, e2sm_mho.MhoTriggerType_name[int32(triggerType)])
 
 	eventTriggerData, err := m.createEventTrigger(triggerType)
 	if err != nil {
@@ -185,7 +166,7 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, t
 
 	ch := make(chan e2api.Indication)
 	node := m.e2client.Node(e2client.NodeID(e2nodeID))
-	subName := "onos-mho-subscription"
+	subName := fmt.Sprintf("onos-mho-subscription-%s", triggerType)
 	subSpec := e2api.SubscriptionSpec{
 		Actions: actions,
 		EventTrigger: e2api.EventTrigger{
@@ -197,7 +178,6 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, t
 		log.Warn(err)
 		return err
 	}
-	log.Debugf("Channel ID:%s", channelID)
 	streamReader, err := m.streams.OpenReader(ctx, node, subName, channelID, subSpec)
 	if err != nil {
 		return err
@@ -221,25 +201,6 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, t
 
 }
 
-func (m *Manager) newSubscription(ctx context.Context, e2NodeID topoapi.ID, triggerType e2sm_mho.MhoTriggerType) error {
-	log.Debugf("TRACE: newSubscription, %v, %v", e2NodeID, triggerType)
-	// TODO revisit this after migrating to use new E2 sdk, it should be the responsibility of the SDK to retry on this call
-	count := 0
-	notifier := func(err error, t time.Duration) {
-		count++
-		log.Infof("Retrying, failed to create subscription for E2 node with ID %s due to %s", e2NodeID, err)
-	}
-
-	err := backoff.RetryNotify(func() error {
-		err := m.createSubscription(ctx, e2NodeID, triggerType)
-		return err
-	}, newExpBackoff(), notifier)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (m *Manager) watchE2Connections(ctx context.Context) error {
 	ch := make(chan topoapi.Event)
 	err := m.rnibClient.WatchE2Connections(ctx, ch)
@@ -260,16 +221,13 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 			triggers[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_CHANGE_RRC_STATUS] = m.appConfig.GetUponChangeRrcStatus()
 			for triggerType, enabled := range triggers {
 				if enabled {
-					log.Debugf("TRACE: watchE2Connections(), %v enabled", e2sm_mho.MhoTriggerType_name[int32(triggerType)])
 					go func(triggerType e2sm_mho.MhoTriggerType) {
-						err := m.newSubscription(ctx, e2NodeID, triggerType)
+						log.Infof("tx subscription, e2NodeID:%v, triggerType:%v", e2NodeID, e2sm_mho.MhoTriggerType_name[int32(triggerType)])
+						err := m.createSubscription(ctx, e2NodeID, triggerType)
 						if err != nil {
 							log.Warn(err)
 						}
 					}(triggerType)
-					time.Sleep(5 * time.Second)
-				} else {
-					log.Debugf("TRACE: watchE2Connections(), %v disabled", e2sm_mho.MhoTriggerType_name[int32(triggerType)])
 				}
 			}
 			go m.watchMHOChanges(ctx, e2NodeID)
@@ -281,23 +239,21 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 
 func (m *Manager) watchMHOChanges(ctx context.Context, e2nodeID topoapi.ID) {
 
-	log.Debugf("TRACE: watchMHOChanges() e2NodeID:%v, chan:%v", e2nodeID, m.CtrlReqChs[string(e2nodeID)])
-
 	for ctrlReqMsg := range m.CtrlReqChs[string(e2nodeID)] {
 		//if string(ctrlReqMsg.E2NodeID) != string(e2nodeID) {
 		//	log.Errorf("E2Node ID does not match: E2Node ID E2Session - %v; E2Node ID in Ctrl Message - %v", e2nodeID, ctrlReqMsg.E2NodeID)
 		//	return
 		//}
 		go func(ctrlReqMsg *e2api.ControlMessage) {
-			log.Debugf("TRACE: watchMHOChanges() SENDING e2NodeID:%v, chan:%v", e2nodeID, m.CtrlReqChs[string(e2nodeID)])
 			node := m.e2client.Node(e2client.NodeID(e2nodeID))
 			ctrlRespMsg, err := node.Control(ctx, ctrlReqMsg)
 			if err != nil {
-				log.Warnf("Error sending control message - %v", err)
+				//TODO - Ignore, MHO does not implement control response message
+				//log.Warnf("Error sending control message - %v", err)
 			} else if ctrlRespMsg == nil {
+				//TODO - Ignore, MHO does not implement control response message
 				log.Debugf("Control response message is nil")
 			}
-			log.Debugf("TRACE: watchMHOChanges() SENT e2NodeID:%v, chan:%v", e2nodeID, m.CtrlReqChs[string(e2nodeID)])
 		}(ctrlReqMsg)
 	}
 }
