@@ -11,6 +11,7 @@ import (
 	"github.com/onosproject/onos-mho/pkg/controller"
 	"github.com/onosproject/onos-mho/pkg/rnib"
 
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	e2client "github.com/onosproject/onos-ric-sdk-go/pkg/e2/v1beta1"
 )
 
@@ -28,6 +29,8 @@ type AppOptions struct {
 	RNIBClient rnib.Client
 
 	IndCh chan *controller.E2NodeIndication
+
+	TriggerType e2sm_mho.MhoTriggerType
 }
 
 // MonitorOptions monitoring options
@@ -95,5 +98,11 @@ func WithRNIBClient(rnibClient rnib.Client) Option {
 func WithIndChan(indCh chan *controller.E2NodeIndication) Option {
 	return newOption(func(options *Options) {
 		options.App.IndCh = indCh
+	})
+}
+
+func WithTriggerType(triggerType e2sm_mho.MhoTriggerType) Option {
+	return newOption(func(options *Options) {
+		options.App.TriggerType = triggerType
 	})
 }

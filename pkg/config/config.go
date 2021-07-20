@@ -80,4 +80,49 @@ func (c *AppConfig) GetReportingPeriod() (uint64, error) {
 	return val, nil
 }
 
+// GetPeriodic returns true if periodic trigger is enabled
+func (c *AppConfig) GetPeriodic() bool {
+	p, err := c.appConfig.Get(PeriodicConfigPath)
+	if err != nil {
+		log.Error(err)
+		return false
+	}
+	switch p.Value.(type) {
+	case bool:
+		return p.Value.(bool)
+	default:
+		return false
+	}
+}
+
+// GetUponRcvMeas returns true if periodic trigger is enabled
+func (c *AppConfig) GetUponRcvMeas() bool {
+	p, err := c.appConfig.Get(UponRcvMeasConfigPath)
+	if err != nil {
+		log.Error(err)
+		return false
+	}
+	switch p.Value.(type) {
+	case bool:
+		return p.Value.(bool)
+	default:
+		return false
+	}
+}
+
+// GetUponChangeRrcStatus returns true if periodic trigger is enabled
+func (c *AppConfig) GetUponChangeRrcStatus() bool {
+	p, err := c.appConfig.Get(UponChangeRrcStatusConfigPath)
+	if err != nil {
+		log.Error(err)
+		return false
+	}
+	switch p.Value.(type) {
+	case bool:
+		return p.Value.(bool)
+	default:
+		return false
+	}
+}
+
 var _ Config = &AppConfig{}
