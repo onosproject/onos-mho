@@ -73,7 +73,6 @@ func (c *MhoCtrl) Run(ctx context.Context) {
 func (c *MhoCtrl) listenIndChan() {
 	var err error
 	for indMsg := range c.IndChan {
-		log.Debugf("Raw message: %v", indMsg)
 
 		indHeaderByte := indMsg.IndMsg.Payload.Header
 		indMessageByte := indMsg.IndMsg.Payload.Message
@@ -83,8 +82,6 @@ func (c *MhoCtrl) listenIndChan() {
 		if err = proto.Unmarshal(indHeaderByte, &indHeader); err == nil {
 			indMessage := e2sm_mho.E2SmMhoIndicationMessage{}
 			if err = proto.Unmarshal(indMessageByte, &indMessage); err == nil {
-				log.Debugf("MHO indication header: %v", indHeader.GetIndicationHeaderFormat1())
-				log.Debugf("MHO indication message: %v", indMessage.GetIndicationMessageFormat1())
 				switch x := indMessage.E2SmMhoIndicationMessage.(type) {
 				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat1:
 					if indMsg.TriggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT {
@@ -93,8 +90,7 @@ func (c *MhoCtrl) listenIndChan() {
 						go c.handlePeriodicReport(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
 					}
 				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat2:
-					log.Debug("TRACE: listenIndChan() go handleIndMsgFormat2")
-					go c.handleIndMsgFormat2(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+					go c.handleRrcState(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
 				default:
 					log.Warnf("Unknown MHO indication message format, indication message: %v", x)
 				}
@@ -108,7 +104,6 @@ func (c *MhoCtrl) listenIndChan() {
 
 func (c *MhoCtrl) listenHandOver() {
 	for hoDecision := range c.HoCtrl.HandoverHandler.Chans.OutputChan {
-		log.Debugf("TRACE: listenHandOver(), Got a HO decision")
 		go func(hoDecision handover.A3HandoverDecision) {
 			if err := c.control(hoDecision); err != nil {
 				log.Error(err)
@@ -118,12 +113,12 @@ func (c *MhoCtrl) listenHandOver() {
 }
 
 func (c *MhoCtrl) handlePeriodicReport(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
-	log.Debug("TRACE: handlePeriodicReport()")
+	log.Infof("rx periodic, e2NodeID:%v", e2NodeID)
 	// TODO - update ueNIB
 }
 
 func (c *MhoCtrl) handleMeasReport(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
-	log.Debug("TRACE: handleMeasReport()")
+	log.Infof("rx measurement, e2NodeID:%v", e2NodeID)
 
 	imsi, err := strconv.Atoi(message.GetUeId().GetValue())
 	if err != nil {
@@ -151,14 +146,6 @@ func (c *MhoCtrl) handleMeasReport(header *e2sm_mho.E2SmMhoIndicationHeaderForma
 			measSCellFound = true
 		} else {
 			ecgiCSCell := id.NewECGI(measReport.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
-			// TODO
-			//cscell := device.NewCell(
-			//	ecgiCSCell,
-			//	meastype.A3OffsetRange(c.HoCtrl.A3OffsetRange),
-			//	meastype.HysteresisRange(c.HoCtrl.HysteresisRange),
-			//	meastype.QOffsetRange(c.HoCtrl.CellIndividualOffset),
-			//	meastype.QOffsetRange(c.HoCtrl.FrequencyOffset),
-			//	meastype.TimeToTriggerRange(c.HoCtrl.TimeToTrigger))
 			cscell := device.NewCell(
 				ecgiCSCell,
 				meastype.A3OffsetRange(1),
@@ -173,7 +160,6 @@ func (c *MhoCtrl) handleMeasReport(header *e2sm_mho.E2SmMhoIndicationHeaderForma
 
 	// TODO - hack for ran-simulator
 	if !measSCellFound {
-		log.Warnf("Serving cell measurement not found")
 		ecgiSCell := id.NewECGI(header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
 		scell := device.NewCell(
 			ecgiSCell,
@@ -188,9 +174,7 @@ func (c *MhoCtrl) handleMeasReport(header *e2sm_mho.E2SmMhoIndicationHeaderForma
 
 	ue.SetCSCells(cscellList)
 	c.cacheUE(ue.GetID(), header, message, e2NodeID)
-	log.Debugf("TRACE: handleMeasReport() Queueing UE to A3 handler, ueID:%v", imsi)
 	c.HoCtrl.A3Handler.Chans.InputChan <- ue
-	log.Debugf("TRACE: handleMeasReport() Queued UE to A3 handler, ueID:%v", imsi)
 
 }
 
@@ -208,9 +192,9 @@ func (c *MhoCtrl) cacheUE(id id.ID, header *e2sm_mho.E2SmMhoIndicationHeaderForm
 
 }
 
-func (c *MhoCtrl) handleIndMsgFormat2(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
-	// TODO
-	log.Debug("Ignore indication message format 2")
+func (c *MhoCtrl) handleRrcState(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+	// TODO - update uenib
+	log.Infof("rx rrc, e2NodeID:%v", e2NodeID)
 
 }
 
@@ -265,9 +249,8 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 		if e2smMhoControlHandler.ControlHeader, err = e2smMhoControlHandler.CreateMhoControlHeader(cellID, cellIDLen, int32(ControlPriority), plmnID); err == nil {
 			if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, ueID, targetCGI); err == nil {
 				if controlRequest, err := e2smMhoControlHandler.CreateMhoControlRequest(); err == nil {
-					log.Infof("TRACE: Queuing HO request to control channel, e2NodeID:%v, ueID:%v, chan:%v", e2NodeID, ueID, c.CtrlReqChans[e2NodeID])
 					c.CtrlReqChans[e2NodeID] <- controlRequest
-					log.Infof("TRACE: Queued HO request to control channel, e2NodeID:%v, ueID:%v, chan:%v", e2NodeID, ueID, c.CtrlReqChans[e2NodeID])
+					log.Infof("tx control, e2NodeID:%v", e2NodeID)
 				}
 			}
 		}
