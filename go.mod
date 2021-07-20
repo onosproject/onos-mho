@@ -5,7 +5,7 @@ go 1.14
 require (
 	cloud.google.com/go v0.54.0 // indirect
 	github.com/atomix/atomix-go-framework v0.7.0 // indirect
-	github.com/cenkalti/backoff/v4 v4.1.1
+	github.com/cenkalti/backoff/v4 v4.1.1 // indirect
 	github.com/envoyproxy/protoc-gen-validate v0.6.1 // indirect
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.5.0 // indirect

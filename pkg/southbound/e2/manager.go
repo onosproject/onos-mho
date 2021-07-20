@@ -6,6 +6,7 @@ package e2
 
 import (
 	"context"
+	"fmt"
 	"github.com/onosproject/onos-mho/pkg/controller"
 	"google.golang.org/protobuf/proto"
 	"strings"
@@ -165,7 +166,7 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, t
 
 	ch := make(chan e2api.Indication)
 	node := m.e2client.Node(e2client.NodeID(e2nodeID))
-	subName := "onos-mho-subscription-" + e2sm_mho.MhoTriggerType_name[int32(triggerType)]
+	subName := fmt.Sprintf("onos-mho-subscription-%s", triggerType)
 	subSpec := e2api.SubscriptionSpec{
 		Actions: actions,
 		EventTrigger: e2api.EventTrigger{

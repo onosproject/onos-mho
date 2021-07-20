@@ -90,7 +90,7 @@ func (c *MhoCtrl) listenIndChan() {
 						go c.handlePeriodicReport(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
 					}
 				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat2:
-					go c.handleRrcState(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+					go c.handleRrcState(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat2(), e2NodeID)
 				default:
 					log.Warnf("Unknown MHO indication message format, indication message: %v", x)
 				}
@@ -113,18 +113,19 @@ func (c *MhoCtrl) listenHandOver() {
 }
 
 func (c *MhoCtrl) handlePeriodicReport(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
-	log.Infof("rx periodic, e2NodeID:%v", e2NodeID)
+	imsi, _ := strconv.Atoi(message.GetUeId().GetValue())
+	log.Infof("rx periodic, e2NodeID:%v, imsi:%v", e2NodeID, imsi)
 	// TODO - update ueNIB
 }
 
 func (c *MhoCtrl) handleMeasReport(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
-	log.Infof("rx measurement, e2NodeID:%v", e2NodeID)
 
 	imsi, err := strconv.Atoi(message.GetUeId().GetValue())
 	if err != nil {
 		log.Error(err)
 		return
 	}
+	log.Infof("rx measurement, e2NodeID:%v, imsi:%v", e2NodeID, imsi)
 	ueid := id.NewUEID(uint64(imsi), uint32(0), header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
 
 	ecgiSCell := id.NewECGI(header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
@@ -192,9 +193,11 @@ func (c *MhoCtrl) cacheUE(id id.ID, header *e2sm_mho.E2SmMhoIndicationHeaderForm
 
 }
 
-func (c *MhoCtrl) handleRrcState(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+func (c *MhoCtrl) handleRrcState(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat2, e2NodeID string) {
 	// TODO - update uenib
-	log.Infof("rx rrc, e2NodeID:%v", e2NodeID)
+	imsi, _ := strconv.Atoi(message.GetUeId().GetValue())
+	rrcState := message.GetRrcStatus()
+	log.Infof("rx rrc, e2NodeID:%v, imsi:%v, rrcState:%v", e2NodeID, imsi, rrcState.String())
 
 }
 
@@ -250,7 +253,7 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 			if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, ueID, targetCGI); err == nil {
 				if controlRequest, err := e2smMhoControlHandler.CreateMhoControlRequest(); err == nil {
 					c.CtrlReqChans[e2NodeID] <- controlRequest
-					log.Infof("tx control, e2NodeID:%v", e2NodeID)
+					log.Infof("tx control, e2NodeID:%v, imsi:%v", e2NodeID, ueID.GetValue())
 				}
 			}
 		}
