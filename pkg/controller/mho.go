@@ -38,6 +38,7 @@ type ueData struct {
 
 type E2NodeIndication struct {
 	NodeID string
+	TriggerType e2sm_mho.MhoTriggerType
 	IndMsg indication.Indication
 }
 
@@ -86,8 +87,11 @@ func (c *MhoCtrl) listenIndChan() {
 				log.Debugf("MHO indication message: %v", indMessage.GetIndicationMessageFormat1())
 				switch x := indMessage.E2SmMhoIndicationMessage.(type) {
 				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat1:
-					log.Debug("TRACE: listenIndChan() go handleIndMsgFormat1")
-					go c.handleIndMsgFormat1(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+					if indMsg.TriggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT {
+						go c.handleMeasReport(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+					}  else if indMsg.TriggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC {
+						go c.handlePeriodicReport(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+					}
 				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat2:
 					log.Debug("TRACE: listenIndChan() go handleIndMsgFormat2")
 					go c.handleIndMsgFormat2(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
@@ -113,9 +117,13 @@ func (c *MhoCtrl) listenHandOver() {
 	}
 }
 
-//*E2SmMhoIndicationMessageFormat1
-func (c *MhoCtrl) handleIndMsgFormat1(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
-	log.Debug("TRACE: handleIndMsgFormat1()")
+func (c *MhoCtrl) handlePeriodicReport(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+	log.Debug("TRACE: handlePeriodicReport()")
+	// TODO - update ueNIB
+}
+
+func (c *MhoCtrl) handleMeasReport(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+	log.Debug("TRACE: handleMeasReport()")
 
 	imsi, err := strconv.Atoi(message.GetUeId().GetValue())
 	if err != nil {
@@ -180,9 +188,9 @@ func (c *MhoCtrl) handleIndMsgFormat1(header *e2sm_mho.E2SmMhoIndicationHeaderFo
 
 	ue.SetCSCells(cscellList)
 	c.cacheUE(ue.GetID(), header, message, e2NodeID)
-	log.Debugf("TRACE: handleIndMsgFormat1() Queueing UE to A3 handler, ueID:%v", imsi)
+	log.Debugf("TRACE: handleMeasReport() Queueing UE to A3 handler, ueID:%v", imsi)
 	c.HoCtrl.A3Handler.Chans.InputChan <- ue
-	log.Debugf("TRACE: handleIndMsgFormat1() Queued UE to A3 handler, ueID:%v", imsi)
+	log.Debugf("TRACE: handleMeasReport() Queued UE to A3 handler, ueID:%v", imsi)
 
 }
 

@@ -122,8 +122,10 @@ func (m *Manager) Start() error {
 }
 
 func (m *Manager) sendIndicationOnStream(streamID broker.StreamID, ch chan e2api.Indication) {
+	log.Debugf("TRACE: sendIndicationOnStream, %v, %v", streamID, ch)
 	streamWriter, err := m.streams.GetWriter(streamID)
 	if err != nil {
+		log.Error(err)
 		return
 	}
 
@@ -157,14 +159,16 @@ func (m *Manager) getRanFunction(serviceModelsInfo map[string]*topoapi.ServiceMo
 
 }
 
-func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID) error {
-	log.Info("Creating subscription for E2 node with ID:", e2nodeID)
-	eventTriggerData, err := m.createEventTriggerOnChange()
+func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, triggerType e2sm_mho.MhoTriggerType) error {
+	log.Infof("Creating MHO subscription for e2NodeID: %v, triggerType:%v", e2nodeID, e2sm_mho.MhoTriggerType_name[int32(triggerType)])
+
+	eventTriggerData, err := m.createEventTrigger(triggerType)
 	if err != nil {
 		log.Error(err)
 		//log.Warn(err)
 		return err
 	}
+
 	aspects, err := m.rnibClient.GetE2NodeAspects(ctx, e2nodeID)
 	if err != nil {
 		log.Warn(err)
@@ -205,7 +209,8 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID) e
 		monitoring.WithStreamReader(streamReader),
 		monitoring.WithNodeID(e2nodeID),
 		monitoring.WithRNIBClient(m.rnibClient),
-		monitoring.WithIndChan(m.indChan))
+		monitoring.WithIndChan(m.indChan),
+		monitoring.WithTriggerType(triggerType))
 
 	err = monitor.Start(ctx)
 	if err != nil {
@@ -216,7 +221,8 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID) e
 
 }
 
-func (m *Manager) newSubscription(ctx context.Context, e2NodeID topoapi.ID) error {
+func (m *Manager) newSubscription(ctx context.Context, e2NodeID topoapi.ID, triggerType e2sm_mho.MhoTriggerType) error {
+	log.Debugf("TRACE: newSubscription, %v, %v", e2NodeID, triggerType)
 	// TODO revisit this after migrating to use new E2 sdk, it should be the responsibility of the SDK to retry on this call
 	count := 0
 	notifier := func(err error, t time.Duration) {
@@ -225,7 +231,7 @@ func (m *Manager) newSubscription(ctx context.Context, e2NodeID topoapi.ID) erro
 	}
 
 	err := backoff.RetryNotify(func() error {
-		err := m.createSubscription(ctx, e2NodeID)
+		err := m.createSubscription(ctx, e2NodeID, triggerType)
 		return err
 	}, newExpBackoff(), notifier)
 	if err != nil {
@@ -248,12 +254,24 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)
 			e2NodeID := relation.Relation.TgtEntityID
 			m.CtrlReqChs[string(e2NodeID)] = make(chan *e2api.ControlMessage)
-			go func() {
-				err := m.newSubscription(ctx, e2NodeID)
-				if err != nil {
-					log.Warn(err)
+			triggers := make (map[e2sm_mho.MhoTriggerType]bool)
+			triggers[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC] = m.appConfig.GetPeriodic()
+			triggers[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT] = m.appConfig.GetUponRcvMeas()
+			triggers[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_CHANGE_RRC_STATUS] = m.appConfig.GetUponChangeRrcStatus()
+			for triggerType, enabled := range triggers {
+				if enabled {
+					log.Debugf("TRACE: watchE2Connections(), %v enabled", e2sm_mho.MhoTriggerType_name[int32(triggerType)])
+					go func(triggerType e2sm_mho.MhoTriggerType) {
+						err := m.newSubscription(ctx, e2NodeID, triggerType)
+						if err != nil {
+							log.Warn(err)
+						}
+					}(triggerType)
+					time.Sleep(5 * time.Second)
+				} else {
+					log.Debugf("TRACE: watchE2Connections(), %v disabled", e2sm_mho.MhoTriggerType_name[int32(triggerType)])
 				}
-			}()
+			}
 			go m.watchMHOChanges(ctx, e2NodeID)
 		}
 
@@ -284,11 +302,8 @@ func (m *Manager) watchMHOChanges(ctx context.Context, e2nodeID topoapi.ID) {
 	}
 }
 
-func (m *Manager) createEventTriggerOnChange() ([]byte, error) {
+func (m *Manager) createEventTrigger(triggerType e2sm_mho.MhoTriggerType) ([]byte, error) {
 	var reportPeriodMs int32
-	// TODO
-	//triggerType := e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT
-	triggerType := e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC
 	reportingPeriod, err := m.appConfig.GetReportingPeriod()
 	if err != nil {
 		return []byte{}, err

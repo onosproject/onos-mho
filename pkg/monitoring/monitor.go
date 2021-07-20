@@ -19,6 +19,8 @@ import (
 
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
+
 	e2ind "github.com/onosproject/onos-ric-sdk-go/pkg/e2/indication"
 
 )
@@ -38,6 +40,7 @@ func NewMonitor(opts ...Option) *Monitor {
 		nodeID:       options.Monitor.NodeID,
 		rnibClient:   options.App.RNIBClient,
 		indChan: options.App.IndCh,
+		triggerType: options.App.TriggerType,
 	}
 }
 
@@ -48,6 +51,7 @@ type Monitor struct {
 	nodeID       topoapi.ID
 	rnibClient   rnib.Client
 	indChan      chan *controller.E2NodeIndication
+	triggerType e2sm_mho.MhoTriggerType
 }
 
 func (m *Monitor) processIndication(ctx context.Context, indication e2api.Indication, nodeID topoapi.ID) error {
@@ -55,9 +59,10 @@ func (m *Monitor) processIndication(ctx context.Context, indication e2api.Indica
 
 	m.indChan <- &controller.E2NodeIndication{
 		NodeID: string(nodeID),
+		TriggerType: m.triggerType,
 		IndMsg: e2ind.Indication{
 			Payload: e2ind.Payload{
-				Header: indication.Header,
+				Header:  indication.Header,
 				Message: indication.Payload,
 			},
 		},
