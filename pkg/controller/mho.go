@@ -6,20 +6,20 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	e2tapi "github.com/onosproject/onos-api/go/onos/e2t/e2"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
+	appConfig "github.com/onosproject/onos-mho/pkg/config"
+	measurmentStore "github.com/onosproject/onos-mho/pkg/store/measurements"
 	"github.com/onosproject/onos-ric-sdk-go/pkg/e2/indication"
 	"github.com/onosproject/rrm-son-lib/pkg/handover"
 	"github.com/onosproject/rrm-son-lib/pkg/model/device"
-	"github.com/onosproject/rrm-son-lib/pkg/model/id"
+	rrmid "github.com/onosproject/rrm-son-lib/pkg/model/id"
 	"github.com/onosproject/rrm-son-lib/pkg/model/measurement"
 	meastype "github.com/onosproject/rrm-son-lib/pkg/model/measurement/type"
 	"google.golang.org/protobuf/proto"
 	"strconv"
-	"sync"
 )
 
 const (
@@ -28,49 +28,46 @@ const (
 
 var log = logging.GetLogger("controller", "mho")
 
-type ueData struct {
-	header     *e2sm_mho.E2SmMhoIndicationHeaderFormat1
-	message    *e2sm_mho.E2SmMhoIndicationMessageFormat1
-	ueID       *e2sm_mho.UeIdentity
-	e2NodeID   string
-	servingCGI *e2sm_mho.CellGlobalId
+type UeData struct {
+	UeID     string
+	E2NodeID string
+	CGI      *e2sm_mho.CellGlobalId
+	RrcState string
 }
 
 type E2NodeIndication struct {
-	NodeID string
+	NodeID      string
 	TriggerType e2sm_mho.MhoTriggerType
-	IndMsg indication.Indication
+	IndMsg      indication.Indication
 }
 
 // MhoCtrl is the controller for MHO
 type MhoCtrl struct {
-	IndChan      chan *E2NodeIndication
-	CtrlReqChans map[string]chan *e2api.ControlMessage
-	HoCtrl       *HandOverController
-	UeCacheLock  *sync.RWMutex
-	UeCache      map[id.ID]ueData
+	IndChan          chan *E2NodeIndication
+	CtrlReqChans     map[string]chan *e2api.ControlMessage
+	HoCtrl           *HandOverController
+	measurementStore measurmentStore.Store
 }
 
 // NewMhoController returns the struct for MHO logic
-func NewMhoController(indChan chan *E2NodeIndication, ctrlReqChs map[string]chan *e2api.ControlMessage) *MhoCtrl {
+func NewMhoController(cfg appConfig.Config, indChan chan *E2NodeIndication, ctrlReqChs map[string]chan *e2api.ControlMessage, store measurmentStore.Store) *MhoCtrl {
 	log.Info("Start onos-mho Application Controller")
 	return &MhoCtrl{
-		IndChan:      indChan,
-		CtrlReqChans: ctrlReqChs,
-		HoCtrl:       NewHandOverController(),
-		UeCacheLock:  &sync.RWMutex{},
-		UeCache:      make(map[id.ID]ueData),
+		IndChan:          indChan,
+		CtrlReqChans:     ctrlReqChs,
+		HoCtrl:           NewHandOverController(cfg),
+		measurementStore: store,
 	}
 }
 
 // Run starts to listen Indication message and then save the result to its struct
 func (c *MhoCtrl) Run(ctx context.Context) {
 	go c.HoCtrl.Run()
-	go c.listenIndChan()
-	c.listenHandOver()
+	go c.listenIndChan(ctx)
+	c.listenHandOver(ctx)
 }
 
-func (c *MhoCtrl) listenIndChan() {
+func (c *MhoCtrl) listenIndChan(ctx context.Context) {
 	var err error
 	for indMsg := range c.IndChan {
 
@@ -85,12 +82,12 @@ func (c *MhoCtrl) listenIndChan() {
 				switch x := indMessage.E2SmMhoIndicationMessage.(type) {
 				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat1:
 					if indMsg.TriggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT {
-						go c.handleMeasReport(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
-					}  else if indMsg.TriggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC {
+						go c.handleMeasReport(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+					} else if indMsg.TriggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC {
 						go c.handlePeriodicReport(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
 					}
 				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat2:
-					go c.handleRrcState(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat2(), e2NodeID)
+					go c.handleRrcState(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat2(), e2NodeID)
 				default:
 					log.Warnf("Unknown MHO indication message format, indication message: %v", x)
 				}
@@ -102,10 +99,10 @@ func (c *MhoCtrl) listenIndChan() {
 	}
 }
 
-func (c *MhoCtrl) listenHandOver() {
+func (c *MhoCtrl) listenHandOver(ctx context.Context) {
 	for hoDecision := range c.HoCtrl.HandoverHandler.Chans.OutputChan {
 		go func(hoDecision handover.A3HandoverDecision) {
-			if err := c.control(hoDecision); err != nil {
+			if err := c.control(ctx, hoDecision); err != nil {
 				log.Error(err)
 			}
 		}(hoDecision)
@@ -113,22 +110,18 @@ func (c *MhoCtrl) listenHandOver() {
 }
 
 func (c *MhoCtrl) handlePeriodicReport(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
-	imsi, _ := strconv.Atoi(message.GetUeId().GetValue())
-	log.Infof("rx periodic, e2NodeID:%v, imsi:%v", e2NodeID, imsi)
+	ueID := message.GetUeId().GetValue()
+	log.Infof("rx periodic, e2NodeID:%v, ueID:%v", e2NodeID, ueID)
 	// TODO - update ueNIB
 }
 
-func (c *MhoCtrl) handleMeasReport(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+func (c *MhoCtrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
 
-	imsi, err := strconv.Atoi(message.GetUeId().GetValue())
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	log.Infof("rx measurement, e2NodeID:%v, imsi:%v", e2NodeID, imsi)
-	ueid := id.NewUEID(uint64(imsi), uint32(0), header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
+	ueID := message.GetUeId().GetValue()
 
-	ecgiSCell := id.NewECGI(header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
+	log.Infof("rx measurement, e2NodeID:%v, ueID:%v", e2NodeID, ueID)
+
+	ecgiSCell := rrmid.NewECGI(header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
 
 	scell := device.NewCell(
 		ecgiSCell,
@@ -139,14 +132,20 @@ func (c *MhoCtrl) handleMeasReport(header *e2sm_mho.E2SmMhoIndicationHeaderForma
 		meastype.TimeToTriggerRange(c.HoCtrl.TimeToTrigger))
 
 	cscellList := make([]device.Cell, 0)
-	ue := device.NewUE(ueid, scell, nil)
+	ueID_int, err := strconv.Atoi(ueID)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	ue := device.NewUE(rrmid.NewUEID(uint64(ueID_int), uint32(0), header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue()), scell, nil)
 	measSCellFound := false
 	for _, measReport := range message.MeasReport {
 		if measReport.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue() == header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue() {
 			ue.GetMeasurements()[ecgiSCell.String()] = measurement.NewMeasEventA3(ecgiSCell, measurement.RSRP(measReport.GetRsrp().GetValue()))
 			measSCellFound = true
 		} else {
-			ecgiCSCell := id.NewECGI(measReport.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
+			ecgiCSCell := rrmid.NewECGI(measReport.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
+			//TODO - Get values from config
 			cscell := device.NewCell(
 				ecgiCSCell,
 				meastype.A3OffsetRange(1),
@@ -161,7 +160,8 @@ func (c *MhoCtrl) handleMeasReport(header *e2sm_mho.E2SmMhoIndicationHeaderForma
 
 	// TODO - hack for ran-simulator
 	if !measSCellFound {
-		ecgiSCell := id.NewECGI(header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
+		log.Warnf("serving cell measurement not present in report, e2NodeID:%v", header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
+		ecgiSCell := rrmid.NewECGI(header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
 		scell := device.NewCell(
 			ecgiSCell,
 			meastype.A3OffsetRange(c.HoCtrl.A3OffsetRange),
@@ -174,58 +174,81 @@ func (c *MhoCtrl) handleMeasReport(header *e2sm_mho.E2SmMhoIndicationHeaderForma
 	}
 
 	ue.SetCSCells(cscellList)
-	c.cacheUE(ue.GetID(), header, message, e2NodeID)
+
+	var ueData *UeData
+	u, err := c.measurementStore.Get(ctx, measurmentStore.Key{UeID: ueID})
+	if err != nil {
+		ueData = &UeData{}
+	} else {
+		t := u.Value.(UeData)
+		ueData = &t
+	}
+
+	//TODO - don't update store if not needed
+	ueData.UeID = ueID
+	ueData.E2NodeID = e2NodeID
+	ueData.CGI = header.GetCgi()
+
+	_, err = c.measurementStore.Put(ctx, measurmentStore.Key{UeID: ueID}, *ueData)
+	if err != nil {
+		log.Warn(err)
+	}
+
 	c.HoCtrl.A3Handler.Chans.InputChan <- ue
 
 }
 
-func (c *MhoCtrl) cacheUE(id id.ID, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1,
-	message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
-	c.UeCacheLock.Lock()
-	defer c.UeCacheLock.Unlock()
-	c.UeCache[id] = ueData{
-		header:     header,
-		message:    message,
-		ueID:       message.GetUeId(),
-		e2NodeID:   e2NodeID,
-		servingCGI: header.GetCgi(),
+func (c *MhoCtrl) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat2, e2NodeID string) {
+	ueID := message.GetUeId().GetValue()
+	rrcState := message.GetRrcStatus().String()
+	log.Infof("rx rrc, e2NodeID:%v, ueID:%v, rrcState:%v", e2NodeID, ueID, rrcState)
+
+	var ueData *UeData
+	u, err := c.measurementStore.Get(ctx, measurmentStore.Key{UeID: ueID})
+	if err != nil {
+		ueData = &UeData{}
+	} else {
+		t := u.Value.(UeData)
+		ueData = &t
+	}
+
+	ueData.UeID = ueID
+	ueData.E2NodeID = e2NodeID
+	ueData.CGI = header.GetCgi()
+	ueData.RrcState = rrcState
+
+	_, err = c.measurementStore.Put(ctx, measurmentStore.Key{UeID: ueID}, *ueData)
+	if err != nil {
+		log.Warn(err)
 	}
 
 }
 
-func (c *MhoCtrl) handleRrcState(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat2, e2NodeID string) {
-	// TODO - update uenib
-	imsi, _ := strconv.Atoi(message.GetUeId().GetValue())
-	rrcState := message.GetRrcStatus()
-	log.Infof("rx rrc, e2NodeID:%v, imsi:%v, rrcState:%v", e2NodeID, imsi, rrcState.String())
-
-}
-
-func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
-	c.UeCacheLock.RLock()
-	defer c.UeCacheLock.RUnlock()
-
+func (c *MhoCtrl) control(ctx context.Context, ho handover.A3HandoverDecision) error {
 	var err error
-	id := ho.UE.GetID()
+	id := ho.UE.GetID().GetID().(rrmid.UEID).IMSI
 
-	ue, ok := c.UeCache[id]
-	if !ok {
-		return fmt.Errorf("UE id %v not found in cache", id)
+	ueID := strconv.Itoa(int(id))
+
+	u, err := c.measurementStore.Get(ctx, measurmentStore.Key{UeID: ueID})
+	if err != nil {
+		log.Warn(err)
 	}
 
-	ueID := ue.ueID
-	e2NodeID := ue.e2NodeID
+	ueData := u.Value.(UeData)
+
+	e2NodeID := ueData.E2NodeID
 
 	// TODO - check servingCGI
 
-	servingCGI := ue.servingCGI
-	cellID := servingCGI.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
-	cellIDLen := servingCGI.GetNrCgi().GetNRcellIdentity().GetValue().GetLen()
-	plmnID := servingCGI.GetNrCgi().GetPLmnIdentity().GetValue()
+	CGI := ueData.CGI
+	cellID := CGI.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
+	cellIDLen := CGI.GetNrCgi().GetNRcellIdentity().GetValue().GetLen()
+	plmnID := CGI.GetNrCgi().GetPLmnIdentity().GetValue()
 
 	e2smMhoControlHandler := &E2SmMhoControlHandler{
-		NodeID:              e2NodeID,
-		ControlAckRequest:   e2tapi.ControlAckRequest_NO_ACK,
+		NodeID:            e2NodeID,
+		ControlAckRequest: e2tapi.ControlAckRequest_NO_ACK,
 	}
 
 	nci, err := strconv.Atoi(ho.TargetCell.GetID().String())
@@ -248,12 +271,16 @@ func (c *MhoCtrl) control(ho handover.A3HandoverDecision) error {
 		},
 	}
 
+	ueIdentity := e2sm_mho.UeIdentity{
+		Value: ueID,
+	}
+
 	go func() {
 		if e2smMhoControlHandler.ControlHeader, err = e2smMhoControlHandler.CreateMhoControlHeader(cellID, cellIDLen, int32(ControlPriority), plmnID); err == nil {
-			if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, ueID, targetCGI); err == nil {
+			if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(CGI, &ueIdentity, targetCGI); err == nil {
 				if controlRequest, err := e2smMhoControlHandler.CreateMhoControlRequest(); err == nil {
 					c.CtrlReqChans[e2NodeID] <- controlRequest
-					log.Infof("tx control, e2NodeID:%v, imsi:%v", e2NodeID, ueID.GetValue())
+					log.Infof("tx control, e2NodeID:%v, ueID:%v", e2NodeID, ueID)
 				}
 			}
 		}

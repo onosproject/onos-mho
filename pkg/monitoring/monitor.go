@@ -36,7 +36,7 @@ func NewMonitor(opts ...Option) *Monitor {
 	}
 	return &Monitor{
 		streamReader: options.Monitor.StreamReader,
-		appConfig:    options.App.AppConfig,
+		appConfig:    options.App.Config,
 		nodeID:       options.Monitor.NodeID,
 		rnibClient:   options.App.RNIBClient,
 		indChan: options.App.IndCh,
@@ -47,7 +47,7 @@ func NewMonitor(opts ...Option) *Monitor {
 // Monitor indication monitor
 type Monitor struct {
 	streamReader broker.StreamReader
-	appConfig    *appConfig.AppConfig
+	appConfig    appConfig.Config
 	nodeID       topoapi.ID
 	rnibClient   rnib.Client
 	indChan      chan *controller.E2NodeIndication

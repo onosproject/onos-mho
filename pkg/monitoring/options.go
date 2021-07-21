@@ -24,7 +24,7 @@ type Options struct {
 
 // AppOptions application options
 type AppOptions struct {
-	AppConfig *appConfig.AppConfig
+	Config appConfig.Config
 
 	RNIBClient rnib.Client
 
@@ -82,9 +82,9 @@ func WithNode(node e2client.Node) Option {
 }
 
 // WithAppConfig sets app config
-func WithAppConfig(appConfig *appConfig.AppConfig) Option {
+func WithAppConfig(config appConfig.Config) Option {
 	return newOption(func(options *Options) {
-		options.App.AppConfig = appConfig
+		options.App.Config = config
 	})
 }
 
