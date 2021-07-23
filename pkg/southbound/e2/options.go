@@ -9,6 +9,7 @@ import (
 	"github.com/onosproject/onos-mho/pkg/broker"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
 	"github.com/onosproject/onos-mho/pkg/controller"
+	"github.com/onosproject/onos-mho/pkg/store/measurements"
 )
 
 // Options E2 client options
@@ -26,13 +27,15 @@ type Options struct {
 type AppOptions struct {
 	AppID string
 
-	AppConfig *appConfig.AppConfig
+	Config appConfig.Config
 
 	Broker broker.Broker
 
 	IndCh chan *controller.E2NodeIndication
 
 	CtrlReqChs map[string]chan *e2api.ControlMessage
+
+	MeasurementStore measurements.Store
 }
 
 // E2TServiceOptions are the options for a E2T service
@@ -147,9 +150,9 @@ func WithAppID(appID string) Option {
 }
 
 // WithAppConfig sets the app config interface
-func WithAppConfig(appConfig *appConfig.AppConfig) Option {
+func WithAppConfig(appConfig appConfig.Config) Option {
 	return newOption(func(options *Options) {
-		options.App.AppConfig = appConfig
+		options.App.Config = appConfig
 	})
 }
 
@@ -171,5 +174,12 @@ func WithIndChan(indCh chan *controller.E2NodeIndication) Option {
 func WithCtrlReqChs(ctrlReqChs map[string]chan *e2api.ControlMessage) Option {
 	return newOption(func(options *Options) {
 		options.App.CtrlReqChs = ctrlReqChs
+	})
+}
+
+// WithMeasurementStore sets measurement store
+func WithMeasurementStore(measurementStore measurements.Store) Option {
+	return newOption(func(options *Options) {
+		options.App.MeasurementStore = measurementStore
 	})
 }

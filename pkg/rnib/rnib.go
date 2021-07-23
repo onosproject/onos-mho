@@ -7,6 +7,8 @@ package rnib
 import (
 	"context"
 
+	"github.com/onosproject/onos-lib-go/pkg/errors"
+
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
 	toposdk "github.com/onosproject/onos-ric-sdk-go/pkg/topo"
 )
@@ -14,6 +16,7 @@ import (
 // TopoClient R-NIB client interface
 type TopoClient interface {
 	WatchE2Connections(ctx context.Context, ch chan topoapi.Event) error
+	GetCells(ctx context.Context, nodeID topoapi.ID) ([]*topoapi.E2Cell, error)
 	GetE2NodeAspects(ctx context.Context, nodeID topoapi.ID) (*topoapi.E2Node, error)
 	E2NodeIDs(ctx context.Context) ([]topoapi.ID, error)
 }
@@ -66,6 +69,34 @@ func (c *Client) GetE2NodeAspects(ctx context.Context, nodeID topoapi.ID) (*topo
 
 	return e2Node, nil
 
+}
+
+// GetCells get list of cells for each E2 node
+func (c *Client) GetCells(ctx context.Context, nodeID topoapi.ID) ([]*topoapi.E2Cell, error) {
+	filter := &topoapi.Filters{
+		RelationFilter: &topoapi.RelationFilter{SrcId: string(nodeID),
+			RelationKind: topoapi.CONTAINS,
+			TargetKind:   ""}}
+
+	objects, err := c.client.List(ctx, toposdk.WithListFilters(filter))
+	if err != nil {
+		return nil, err
+	}
+	var cells []*topoapi.E2Cell
+	for _, obj := range objects {
+		targetEntity := obj.GetEntity()
+		if targetEntity.GetKindID() == topoapi.E2CELL {
+			cellObject := &topoapi.E2Cell{}
+			obj.GetAspect(cellObject)
+			cells = append(cells, cellObject)
+		}
+	}
+
+	if len(cells) == 0 {
+		return nil, errors.New(errors.NotFound, "there is no cell to subscribe for e2 node %s", nodeID)
+	}
+
+	return cells, nil
 }
 
 func getControlRelationFilter() *topoapi.Filters {

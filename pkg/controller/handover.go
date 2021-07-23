@@ -5,17 +5,10 @@
 package controller
 
 import (
+	appConfig "github.com/onosproject/onos-mho/pkg/config"
 	"github.com/onosproject/rrm-son-lib/pkg/handover"
 	measurement2 "github.com/onosproject/rrm-son-lib/pkg/measurement"
 	"github.com/onosproject/rrm-son-lib/pkg/model/device"
-)
-
-const (
-	A3OffsetRangeConfigPath        = "/hoParameters/A3OffsetRange"
-	HysteresisRangeConfigPath      = "/hoParameters/HysteresisRange"
-	CellIndividualOffsetConfigPath = "/hoParameters/CellIndividualOffset"
-	FrequencyOffsetConfigPath      = "/hoParameters/FrequencyOffset"
-	TimeToTriggerConfigPath        = "/hoParameters/TimeToTrigger"
 )
 
 // HandOverController is the handover controller
@@ -30,11 +23,16 @@ type HandOverController struct {
 	HandoverHandler      *handover.A3HandoverHandler
 }
 
-func NewHandOverController() *HandOverController {
+func NewHandOverController(cfg appConfig.Config) *HandOverController {
 	return &HandOverController{
-		UeChan:          make(chan device.UE),
-		A3Handler:       measurement2.NewMeasEventA3Handler(),
-		HandoverHandler: handover.NewA3HandoverHandler(),
+		A3OffsetRange:        cfg.GetA3OffsetRange(),
+		HysteresisRange:      cfg.GetHysteresisRange(),
+		CellIndividualOffset: cfg.GetCellIndividualOffset(),
+		FrequencyOffset:      cfg.GetFrequencyOffset(),
+		TimeToTrigger:        cfg.GetTimeToTrigger(),
+		UeChan:               make(chan device.UE),
+		A3Handler:            measurement2.NewMeasEventA3Handler(),
+		HandoverHandler:      handover.NewA3HandoverHandler(),
 	}
 }
 

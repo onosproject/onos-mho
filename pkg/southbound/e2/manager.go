@@ -13,8 +13,6 @@ import (
 
 	"github.com/onosproject/onos-mho/pkg/monitoring"
 
-	//"github.com/onosproject/onos-mho/pkg/utils/control"
-
 	prototypes "github.com/gogo/protobuf/types"
 	"github.com/onosproject/onos-lib-go/pkg/errors"
 
@@ -49,10 +47,11 @@ type Manager struct {
 	e2client     e2client.Client
 	rnibClient   rnib.Client
 	serviceModel ServiceModelOptions
-	appConfig    *appConfig.AppConfig
+	appConfig    appConfig.Config
 	streams      broker.Broker
 	indChan      chan *controller.E2NodeIndication
 	CtrlReqChs map[string]chan *e2api.ControlMessage
+
 }
 
 // NewManager creates a new subscription manager
@@ -83,7 +82,7 @@ func NewManager(opts ...Option) (Manager, error) {
 			Name:    options.ServiceModel.Name,
 			Version: options.ServiceModel.Version,
 		},
-		appConfig:   options.App.AppConfig,
+		appConfig:   options.App.Config,
 		streams:     options.App.Broker,
 		indChan: options.App.IndCh,
 		CtrlReqChs: options.App.CtrlReqChs,
@@ -231,19 +230,26 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 				}
 			}
 			go m.watchMHOChanges(ctx, e2NodeID)
+		} else if topoEvent.Type == topoapi.EventType_REMOVED {
+			// TODO - Handle E2 node disconnect
+			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)
+			e2NodeID := relation.Relation.TgtEntityID
+			cellIDs, err := m.rnibClient.GetCells(ctx, e2NodeID)
+			if err != nil {
+				return err
+			}
+			for _, cellID := range cellIDs {
+				log.Debugf("cell removed, e2NodeID:%v, cellID:%v", e2NodeID, cellID.CellGlobalID.GetValue())
+			}
 		}
-
 	}
+
 	return nil
 }
 
 func (m *Manager) watchMHOChanges(ctx context.Context, e2nodeID topoapi.ID) {
 
 	for ctrlReqMsg := range m.CtrlReqChs[string(e2nodeID)] {
-		//if string(ctrlReqMsg.E2NodeID) != string(e2nodeID) {
-		//	log.Errorf("E2Node ID does not match: E2Node ID E2Session - %v; E2Node ID in Ctrl Message - %v", e2nodeID, ctrlReqMsg.E2NodeID)
-		//	return
-		//}
 		go func(ctrlReqMsg *e2api.ControlMessage) {
 			node := m.e2client.Node(e2client.NodeID(e2nodeID))
 			ctrlRespMsg, err := node.Control(ctx, ctrlReqMsg)
