@@ -9,7 +9,7 @@ import (
 	"github.com/onosproject/onos-mho/pkg/broker"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
 	"github.com/onosproject/onos-mho/pkg/controller"
-	"github.com/onosproject/onos-mho/pkg/store/measurements"
+	"github.com/onosproject/onos-mho/pkg/store"
 )
 
 // Options E2 client options
@@ -35,7 +35,7 @@ type AppOptions struct {
 
 	CtrlReqChs map[string]chan *e2api.ControlMessage
 
-	MeasurementStore measurements.Store
+	MeasurementStore store.Store
 }
 
 // E2TServiceOptions are the options for a E2T service
@@ -118,20 +118,6 @@ func WithE2SubAddress(host string, port int) Option {
 	})
 }
 
-// WithE2SubHost sets the host for the e2sub service
-func WithE2SubHost(host string) Option {
-	return newOption(func(options *Options) {
-		options.E2SubService.Host = host
-	})
-}
-
-// WithE2SubPort sets the port for the e2sub service
-func WithE2SubPort(port int) Option {
-	return newOption(func(options *Options) {
-		options.E2SubService.Port = port
-	})
-}
-
 // WithServiceModel sets the client service model
 func WithServiceModel(name ServiceModelName, version ServiceModelVersion) Option {
 	return newOption(func(options *Options) {
@@ -178,7 +164,7 @@ func WithCtrlReqChs(ctrlReqChs map[string]chan *e2api.ControlMessage) Option {
 }
 
 // WithMeasurementStore sets measurement store
-func WithMeasurementStore(measurementStore measurements.Store) Option {
+func WithMeasurementStore(measurementStore store.Store) Option {
 	return newOption(func(options *Options) {
 		options.App.MeasurementStore = measurementStore
 	})

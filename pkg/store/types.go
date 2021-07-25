@@ -2,19 +2,7 @@
 //
 // SPDX-License-Identifier: LicenseRef-ONF-Member-1.0
 
-package measurements
-
-// MeasurementItem measurement item
-type MeasurementItem struct {
-	MeasurementRecords []MeasurementRecord
-}
-
-// MeasurementRecord measurement record
-type MeasurementRecord struct {
-	Timestamp        uint64
-	MeasurementName  string
-	MeasurementValue interface{}
-}
+package store
 
 // Key is the key of monitoring result metric store
 type Key struct {

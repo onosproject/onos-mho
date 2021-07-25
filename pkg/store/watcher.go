@@ -2,18 +2,16 @@
 //
 // SPDX-License-Identifier: LicenseRef-ONF-Member-1.0
 
-package watcher
+package store
 
 import (
 	"sync"
-
-	"github.com/onosproject/onos-mho/pkg/store/event"
 
 	"github.com/google/uuid"
 )
 
 // EventChannel is a channel which can accept an Event
-type EventChannel chan event.Event
+type EventChannel chan Event
 
 // Watchers stores the information about watchers
 type Watchers struct {
@@ -24,7 +22,7 @@ type Watchers struct {
 // Watcher event watcher
 type Watcher struct {
 	id uuid.UUID
-	ch chan<- event.Event
+	ch chan<- Event
 }
 
 // NewWatchers creates watchers
@@ -35,7 +33,7 @@ func NewWatchers() *Watchers {
 }
 
 // Send sends an event for all registered watchers
-func (ws *Watchers) Send(event event.Event) {
+func (ws *Watchers) Send(event Event) {
 	ws.rm.RLock()
 	go func() {
 		for _, watcher := range ws.watchers {
@@ -46,7 +44,7 @@ func (ws *Watchers) Send(event event.Event) {
 }
 
 // AddWatcher adds a watcher
-func (ws *Watchers) AddWatcher(id uuid.UUID, ch chan<- event.Event) error {
+func (ws *Watchers) AddWatcher(id uuid.UUID, ch chan<- Event) error {
 	ws.rm.Lock()
 	watcher := Watcher{
 		id: id,

@@ -11,7 +11,7 @@ import (
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
-	measurmentStore "github.com/onosproject/onos-mho/pkg/store/measurements"
+	"github.com/onosproject/onos-mho/pkg/store"
 	"github.com/onosproject/onos-ric-sdk-go/pkg/e2/indication"
 	"github.com/onosproject/rrm-son-lib/pkg/handover"
 	"github.com/onosproject/rrm-son-lib/pkg/model/device"
@@ -26,7 +26,7 @@ const (
 	ControlPriority = 10
 )
 
-var log = logging.GetLogger("controller", "mho")
+var log = logging.GetLogger("controller")
 
 type UeData struct {
 	UeID     string
@@ -46,22 +46,23 @@ type MhoCtrl struct {
 	IndChan          chan *E2NodeIndication
 	CtrlReqChans     map[string]chan *e2api.ControlMessage
 	HoCtrl           *HandOverController
-	measurementStore measurmentStore.Store
+	store store.Store
 }
 
 // NewMhoController returns the struct for MHO logic
-func NewMhoController(cfg appConfig.Config, indChan chan *E2NodeIndication, ctrlReqChs map[string]chan *e2api.ControlMessage, store measurmentStore.Store) *MhoCtrl {
-	log.Info("Start onos-mho Application Controller")
+func NewMhoController(cfg appConfig.Config, indChan chan *E2NodeIndication, ctrlReqChs map[string]chan *e2api.ControlMessage, store store.Store) *MhoCtrl {
+	log.Info("Init MhoController")
 	return &MhoCtrl{
 		IndChan:          indChan,
 		CtrlReqChans:     ctrlReqChs,
 		HoCtrl:           NewHandOverController(cfg),
-		measurementStore: store,
+		store: store,
 	}
 }
 
 // Run starts to listen Indication message and then save the result to its struct
 func (c *MhoCtrl) Run(ctx context.Context) {
+	log.Info("Start MhoController")
 	go c.HoCtrl.Run()
 	go c.listenIndChan(ctx)
 	c.listenHandOver(ctx)
@@ -84,7 +85,7 @@ func (c *MhoCtrl) listenIndChan(ctx context.Context) {
 					if indMsg.TriggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT {
 						go c.handleMeasReport(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
 					} else if indMsg.TriggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC {
-						go c.handlePeriodicReport(indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+						go c.handlePeriodicReport(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
 					}
 				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat2:
 					go c.handleRrcState(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat2(), e2NodeID)
@@ -109,10 +110,26 @@ func (c *MhoCtrl) listenHandOver(ctx context.Context) {
 	}
 }
 
-func (c *MhoCtrl) handlePeriodicReport(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+func (c *MhoCtrl) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
 	ueID := message.GetUeId().GetValue()
 	log.Infof("rx periodic, e2NodeID:%v, ueID:%v", e2NodeID, ueID)
-	// TODO - update ueNIB
+	var ueData *UeData
+	u, err := c.store.Get(ctx, store.Key{UeID: ueID})
+	if err != nil {
+		ueData = &UeData{}
+	} else {
+		t := u.Value.(UeData)
+		ueData = &t
+	}
+
+	ueData.UeID = ueID
+	ueData.E2NodeID = e2NodeID
+	ueData.CGI = header.GetCgi()
+
+	_, err = c.store.Put(ctx, store.Key{UeID: ueID}, *ueData)
+	if err != nil {
+		log.Warn(err)
+	}
 }
 
 func (c *MhoCtrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
@@ -176,7 +193,7 @@ func (c *MhoCtrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMho
 	ue.SetCSCells(cscellList)
 
 	var ueData *UeData
-	u, err := c.measurementStore.Get(ctx, measurmentStore.Key{UeID: ueID})
+	u, err := c.store.Get(ctx, store.Key{UeID: ueID})
 	if err != nil {
 		ueData = &UeData{}
 	} else {
@@ -189,7 +206,7 @@ func (c *MhoCtrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMho
 	ueData.E2NodeID = e2NodeID
 	ueData.CGI = header.GetCgi()
 
-	_, err = c.measurementStore.Put(ctx, measurmentStore.Key{UeID: ueID}, *ueData)
+	_, err = c.store.Put(ctx, store.Key{UeID: ueID}, *ueData)
 	if err != nil {
 		log.Warn(err)
 	}
@@ -204,7 +221,7 @@ func (c *MhoCtrl) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMhoIn
 	log.Infof("rx rrc, e2NodeID:%v, ueID:%v, rrcState:%v", e2NodeID, ueID, rrcState)
 
 	var ueData *UeData
-	u, err := c.measurementStore.Get(ctx, measurmentStore.Key{UeID: ueID})
+	u, err := c.store.Get(ctx, store.Key{UeID: ueID})
 	if err != nil {
 		ueData = &UeData{}
 	} else {
@@ -217,7 +234,7 @@ func (c *MhoCtrl) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMhoIn
 	ueData.CGI = header.GetCgi()
 	ueData.RrcState = rrcState
 
-	_, err = c.measurementStore.Put(ctx, measurmentStore.Key{UeID: ueID}, *ueData)
+	_, err = c.store.Put(ctx, store.Key{UeID: ueID}, *ueData)
 	if err != nil {
 		log.Warn(err)
 	}
@@ -230,7 +247,7 @@ func (c *MhoCtrl) control(ctx context.Context, ho handover.A3HandoverDecision) e
 
 	ueID := strconv.Itoa(int(id))
 
-	u, err := c.measurementStore.Get(ctx, measurmentStore.Key{UeID: ueID})
+	u, err := c.store.Get(ctx, store.Key{UeID: ueID})
 	if err != nil {
 		log.Warn(err)
 	}

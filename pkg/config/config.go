@@ -17,8 +17,6 @@ import (
 
 var log = logging.GetLogger("config")
 
-const defaultConfigPath = "/etc/onos/config/config.json"
-
 const (
 	ReportingPeriodConfigPath = "reportingPeriod"
 	PeriodicConfigPath = "periodic"
@@ -46,8 +44,8 @@ type Config interface {
 }
 
 // NewConfig initialize the xApp config
-func NewConfig() (Config, error) {
-	appConfig, err := configurable.RegisterConfigurable(defaultConfigPath, &configurable.RegisterRequest{})
+func NewConfig(configPath string) (Config, error) {
+	appConfig, err := configurable.RegisterConfigurable(configPath, &configurable.RegisterRequest{})
 	if err != nil {
 		return nil, err
 	}

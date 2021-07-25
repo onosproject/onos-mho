@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: LicenseRef-ONF-Member-1.0
 
-package measurements
+package store
 
 import (
 	"context"
@@ -12,10 +12,6 @@ import (
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 
 	"github.com/google/uuid"
-
-	"github.com/onosproject/onos-mho/pkg/store/watcher"
-
-	"github.com/onosproject/onos-mho/pkg/store/event"
 
 	"github.com/onosproject/onos-lib-go/pkg/errors"
 )
@@ -36,18 +32,18 @@ type Store interface {
 	Entries(ctx context.Context, ch chan<- *Entry) error
 
 	// Watch measurement store changes
-	Watch(ctx context.Context, ch chan<- event.Event) error
+	Watch(ctx context.Context, ch chan<- Event) error
 }
 
 type store struct {
 	measurements map[Key]*Entry
 	mu           sync.RWMutex
-	watchers     *watcher.Watchers
+	watchers     *Watchers
 }
 
 // NewStore creates new store
 func NewStore() Store {
-	watchers := watcher.NewWatchers()
+	watchers := NewWatchers()
 	return &store{
 		measurements: make(map[Key]*Entry),
 		watchers:     watchers,
@@ -88,7 +84,7 @@ func (s *store) Put(ctx context.Context, key Key, value interface{}) (*Entry, er
 		Value: value,
 	}
 	s.measurements[key] = entry
-	s.watchers.Send(event.Event{
+	s.watchers.Send(Event{
 		Key:   key,
 		Value: entry,
 		Type:  Created,
@@ -106,7 +102,7 @@ func (s *store) Get(ctx context.Context, key Key) (*Entry, error) {
 	return nil, errors.New(errors.NotFound, "the measurement entry does not exist")
 }
 
-func (s *store) Watch(ctx context.Context, ch chan<- event.Event) error {
+func (s *store) Watch(ctx context.Context, ch chan<- Event) error {
 	id := uuid.New()
 	err := s.watchers.AddWatcher(id, ch)
 	if err != nil {
