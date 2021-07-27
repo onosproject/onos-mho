@@ -73,7 +73,7 @@ func VerifyNumUesInStore(ctx context.Context, t *testing.T, mgr *manager.Manager
 	if err != nil {
 		return err
 	}
-	if numUes > 0 {
+	if numUes >= TotalNumUEs {
 		return nil
 	}
 	return fmt.Errorf("%s", "Test failed - the number of UEs does not matched")
