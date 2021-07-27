@@ -13,9 +13,9 @@ import (
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
 	"github.com/onosproject/onos-mho/pkg/controller"
 	"github.com/onosproject/onos-mho/pkg/southbound/e2"
-	"github.com/onosproject/onos-mho/pkg/store/measurements"
-	app "github.com/onosproject/onos-ric-sdk-go/pkg/config/app/default"
+	"github.com/onosproject/onos-mho/pkg/store"
 	"github.com/onosproject/onos-mho/pkg/uenib"
+	app "github.com/onosproject/onos-ric-sdk-go/pkg/config/app/default"
 )
 
 var log = logging.GetLogger("manager")
@@ -35,12 +35,12 @@ type Config struct {
 
 // NewManager creates a new manager
 func NewManager(config Config) *Manager {
-	appCfg, err := appConfig.NewConfig()
+	appCfg, err := appConfig.NewConfig(config.ConfigPath)
 	if err != nil {
 		log.Warn(err)
 	}
 	subscriptionBroker := broker.NewBroker()
-	measStore := measurements.NewStore()
+	mhoStore := store.NewStore()
 
 	indCh := make(chan *controller.E2NodeIndication)
 	ctrlReqChs := make(map[string]chan *e2api.ControlMessage)
@@ -54,7 +54,7 @@ func NewManager(config Config) *Manager {
 		e2.WithBroker(subscriptionBroker),
 		e2.WithIndChan(indCh),
 		e2.WithCtrlReqChs(ctrlReqChs),
-		e2.WithMeasurementStore(measStore))
+		e2.WithMeasurementStore(mhoStore))
 
 	if err != nil {
 		log.Warn(err)
@@ -64,8 +64,8 @@ func NewManager(config Config) *Manager {
 		appConfig:   appCfg,
 		config:      config,
 		e2Manager:   e2Manager,
-		mhoCtrl:     controller.NewMhoController(appCfg, indCh, ctrlReqChs, measStore),
-		measurementStore: measStore,
+		mhoCtrl:     controller.NewMhoController(appCfg, indCh, ctrlReqChs, mhoStore),
+		mhoStore: mhoStore,
 	}
 	return manager
 }
@@ -76,19 +76,18 @@ type Manager struct {
 	config      Config
 	e2Manager   e2.Manager
 	mhoCtrl     *controller.MhoCtrl
-	measurementStore measurements.Store
+	mhoStore store.Store
 }
 
 // Run starts the manager and the associated services
 func (m *Manager) Run() {
 	log.Info("Running Manager")
-	if err := m.Start(); err != nil {
+	if err := m.start(); err != nil {
 		log.Fatal("Unable to run Manager", err)
 	}
 }
 
-// Start starts the manager
-func (m *Manager) Start() error {
+func (m *Manager) start() error {
 	// Start Northbound server
 	err := m.startNorthboundServer()
 	go m.startUENIBUpdater()
@@ -102,7 +101,7 @@ func (m *Manager) Start() error {
 		return err
 	}
 
-	m.mhoCtrl.Run(context.Background())
+	go m.mhoCtrl.Run(context.Background())
 
 	return nil
 }
@@ -122,7 +121,7 @@ func (m *Manager) startNorthboundServer() error {
 		northbound.SecurityConfig{}))
 
 	//TODO - MHO northbound service
-	//s.AddService(nbi.NewService(m.measurementStore))
+	//s.AddService(nbi.NewService(m.mhoStore))
 
 	doneCh := make(chan error)
 	go func() {
@@ -139,11 +138,11 @@ func (m *Manager) startNorthboundServer() error {
 
 func (m *Manager) startUENIBUpdater() {
 	ctx := context.Background()
-	s := uenib.NewUENIBClient(ctx, m.config.CertPath, m.config.KeyPath, m.measurementStore)
+	s := uenib.NewUENIBClient(ctx, m.config.CertPath, m.config.KeyPath, m.mhoStore)
 	s.Run(ctx)
 }
 
-// GetMeasurementStore returns measurement store
-func (m *Manager) GetMeasurementStore() measurements.Store {
-	return m.measurementStore
+// GetMhoStore returns measurement store
+func (m *Manager) GetMhoStore() store.Store {
+	return m.mhoStore
 }

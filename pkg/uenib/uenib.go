@@ -10,9 +10,8 @@ import (
 	"github.com/onosproject/onos-api/go/onos/uenib"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-lib-go/pkg/southbound"
-	"github.com/onosproject/onos-mho/pkg/store/event"
 	"github.com/onosproject/onos-mho/pkg/controller"
-	measurementStore "github.com/onosproject/onos-mho/pkg/store/measurements"
+	"github.com/onosproject/onos-mho/pkg/store"
 )
 
 const (
@@ -23,7 +22,7 @@ const (
 var log = logging.GetLogger("uenib")
 
 // NewUENIBClient returns new UENIBClient object
-func NewUENIBClient(ctx context.Context, certPath string, keyPath string, store measurementStore.Store) Client {
+func NewUENIBClient(ctx context.Context, certPath string, keyPath string, store store.Store) Client {
 	conn, err := southbound.Connect(ctx, UENIBAddress, certPath, keyPath)
 
 	if err != nil {
@@ -31,7 +30,7 @@ func NewUENIBClient(ctx context.Context, certPath string, keyPath string, store 
 	}
 	return &client{
 		client:           uenib.NewUEServiceClient(conn),
-		measurementStore: store,
+		store: store,
 	}
 }
 
@@ -40,36 +39,36 @@ type Client interface {
 	// Run runs UENIBClient
 	Run(ctx context.Context)
 
-	// UpdateMHOResult updates MHO results to UENIB
-	UpdateMHOResult(ctx context.Context, measEntry *measurementStore.Entry)
+	// UpdateMhoResult updates MHO results to UENIB
+	UpdateMhoResult(ctx context.Context, measEntry *store.Entry)
 
-	// WatchMeasStore watches measurement entries
-	WatchMeasStore(ctx context.Context, ch chan event.Event)
+	// WatchMhoStore watches store entries
+	WatchMhoStore(ctx context.Context, ch chan store.Event)
 }
 
 type client struct {
 	client           uenib.UEServiceClient
-	measurementStore measurementStore.Store
+	store store.Store
 }
 
-func (c *client) WatchMeasStore(ctx context.Context, ch chan event.Event) {
+func (c *client) WatchMhoStore(ctx context.Context, ch chan store.Event) {
 	for e := range ch {
-		measEntry := e.Value.(*measurementStore.Entry)
-		c.UpdateMHOResult(ctx, measEntry)
+		measEntry := e.Value.(*store.Entry)
+		c.UpdateMhoResult(ctx, measEntry)
 	}
 }
 
 func (c *client) Run(ctx context.Context) {
-	ch := make(chan event.Event)
-	err := c.measurementStore.Watch(ctx, ch)
+	ch := make(chan store.Event)
+	err := c.store.Watch(ctx, ch)
 	if err != nil {
 		log.Warn(err)
 	}
 
-	go c.WatchMeasStore(ctx, ch)
+	go c.WatchMhoStore(ctx, ch)
 }
 
-func (c *client) UpdateMHOResult(ctx context.Context, measEntry *measurementStore.Entry) {
+func (c *client) UpdateMhoResult(ctx context.Context, measEntry *store.Entry) {
 	req := c.createUENIBUpdateReq(measEntry)
 	log.Debugf("UpdateReq msg: %v", req)
 	resp, err := c.client.UpdateUE(ctx, req)
@@ -80,11 +79,11 @@ func (c *client) UpdateMHOResult(ctx context.Context, measEntry *measurementStor
 	log.Debugf("resp: %v", resp)
 }
 
-func (c *client) createUENIBUpdateReq(measEntry *measurementStore.Entry) *uenib.UpdateUERequest {
+func (c *client) createUENIBUpdateReq(measEntry *store.Entry) *uenib.UpdateUERequest {
 	keyID := measEntry.Key.UeID
 	ueData := measEntry.Value.(controller.UeData)
-	log.Infof("Key ID to be stored in UENIB: %v", keyID)
-	log.Infof("Meas Items to be stored in UENIB: %v", ueData)
+	//log.Debugf("Key ID to be stored in UENIB: %v", keyID)
+	//log.Debugf("UeData to be stored in UENIB: %v", ueData)
 
 	uenibObj := uenib.UE{
 		ID:      uenib.ID(keyID),

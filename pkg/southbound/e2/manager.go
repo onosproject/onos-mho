@@ -56,6 +56,7 @@ type Manager struct {
 
 // NewManager creates a new subscription manager
 func NewManager(opts ...Option) (Manager, error) {
+	log.Info("Init E2Manager")
 	options := Options{}
 
 	for _, opt := range opts {
@@ -92,6 +93,7 @@ func NewManager(opts ...Option) (Manager, error) {
 
 // Start starts subscription manager
 func (m *Manager) Start() error {
+	log.Info("Start E2Manager")
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -201,6 +203,7 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, t
 }
 
 func (m *Manager) watchE2Connections(ctx context.Context) error {
+	log.Info("Start monitoring E2 connections")
 	ch := make(chan topoapi.Event)
 	err := m.rnibClient.WatchE2Connections(ctx, ch)
 	if err != nil {

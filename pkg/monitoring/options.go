@@ -36,7 +36,6 @@ type AppOptions struct {
 // MonitorOptions monitoring options
 type MonitorOptions struct {
 	Node         e2client.Node
-	Measurements []*topoapi.KPMMeasurement
 	NodeID       topoapi.ID
 	StreamReader broker.StreamReader
 }

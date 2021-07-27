@@ -24,6 +24,7 @@ type HandOverController struct {
 }
 
 func NewHandOverController(cfg appConfig.Config) *HandOverController {
+	log.Info("Init HandOverController")
 	return &HandOverController{
 		A3OffsetRange:        cfg.GetA3OffsetRange(),
 		HysteresisRange:      cfg.GetHysteresisRange(),
@@ -37,11 +38,13 @@ func NewHandOverController(cfg appConfig.Config) *HandOverController {
 }
 
 func (h *HandOverController) Run() {
-
+	log.Info("Start A3Handler")
 	go h.A3Handler.Run()
 
+	log.Info("Start HandoverHandler")
 	go h.HandoverHandler.Run()
 
+	log.Info("Start forwarding A3Handler events to HandoverHandler")
 	for ue := range h.A3Handler.Chans.OutputChan {
 		h.HandoverHandler.Chans.InputChan <- ue
 	}
