@@ -6,12 +6,14 @@ package uenib
 
 import (
 	"context"
+	"fmt"
 	"github.com/gogo/protobuf/types"
 	"github.com/onosproject/onos-api/go/onos/uenib"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-lib-go/pkg/southbound"
-	"github.com/onosproject/onos-mho/pkg/controller"
+	"github.com/onosproject/onos-mho/pkg/mho"
 	"github.com/onosproject/onos-mho/pkg/store"
+	"strconv"
 )
 
 const (
@@ -40,7 +42,7 @@ type Client interface {
 	Run(ctx context.Context)
 
 	// UpdateMhoResult updates MHO results to UENIB
-	UpdateMhoResult(ctx context.Context, measEntry *store.Entry)
+	UpdateMhoResult(ctx context.Context, entry *store.Entry)
 
 	// WatchMhoStore watches store entries
 	WatchMhoStore(ctx context.Context, ch chan store.Event)
@@ -53,8 +55,8 @@ type client struct {
 
 func (c *client) WatchMhoStore(ctx context.Context, ch chan store.Event) {
 	for e := range ch {
-		measEntry := e.Value.(*store.Entry)
-		c.UpdateMhoResult(ctx, measEntry)
+		entry := e.Value.(*store.Entry)
+		c.UpdateMhoResult(ctx, entry)
 	}
 }
 
@@ -68,8 +70,8 @@ func (c *client) Run(ctx context.Context) {
 	go c.WatchMhoStore(ctx, ch)
 }
 
-func (c *client) UpdateMhoResult(ctx context.Context, measEntry *store.Entry) {
-	req := c.createUENIBUpdateReq(measEntry)
+func (c *client) UpdateMhoResult(ctx context.Context, entry *store.Entry) {
+	req := c.createUENIBUpdateReq(entry)
 	log.Debugf("UpdateReq msg: %v", req)
 	resp, err := c.client.UpdateUE(ctx, req)
 	if err != nil {
@@ -79,14 +81,14 @@ func (c *client) UpdateMhoResult(ctx context.Context, measEntry *store.Entry) {
 	log.Debugf("resp: %v", resp)
 }
 
-func (c *client) createUENIBUpdateReq(measEntry *store.Entry) *uenib.UpdateUERequest {
-	keyID := measEntry.Key.UeID
-	ueData := measEntry.Value.(controller.UeData)
+func (c *client) createUENIBUpdateReq(entry *store.Entry) *uenib.UpdateUERequest {
+	ueID := entry.Key
+	ueData := entry.Value.(mho.UeData)
 	//log.Debugf("Key ID to be stored in UENIB: %v", keyID)
 	//log.Debugf("UeData to be stored in UENIB: %v", ueData)
 
 	uenibObj := uenib.UE{
-		ID:      uenib.ID(keyID),
+		ID:      uenib.ID(ueID),
 		Aspects: make(map[string]*types.Any),
 	}
 
@@ -94,6 +96,29 @@ func (c *client) createUENIBUpdateReq(measEntry *store.Entry) *uenib.UpdateUEReq
 		TypeUrl: "RRCState",
 		// TODO
 		Value:   []byte(ueData.RrcState),
+	}
+
+	uenibObj.Aspects["CGI"] = &types.Any{
+		TypeUrl: "CGI",
+		// TODO
+		Value: []byte(ueData.CGIString),
+	}
+
+	uenibObj.Aspects["RSRP-Serving"] = &types.Any{
+		TypeUrl: "RSRP-Serving",
+		// TODO
+		Value: []byte(strconv.Itoa(int(ueData.RsrpServing))),
+	}
+
+	var str string
+	for cgi, rsrp := range ueData.RsrpNeighbors {
+		str = str + fmt.Sprintf("%s:%s ", cgi, strconv.Itoa(int(rsrp)))
+	}
+
+	uenibObj.Aspects["RSRP-Neighbors"] = &types.Any{
+		TypeUrl: "RSRP-Neighbors",
+		// TODO
+		Value: []byte(str),
 	}
 
 	return &uenib.UpdateUERequest{

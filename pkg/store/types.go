@@ -4,31 +4,26 @@
 
 package store
 
-// Key is the key of monitoring result metric store
-type Key struct {
-	UeID       string
-}
-
-// Entry measurement store entry
+// Entry is store entry
 type Entry struct {
-	Key   Key
+	Key   string
 	Value interface{}
 }
 
-// MeasurementEvent a measurement event
-type MeasurementEvent int
+// StoreEvent is a store event
+type EventType int
 
 const (
 	// None none cell event
-	None MeasurementEvent = iota
-	// Created created measurement event
+	None EventType = iota
+	// Created created store event
 	Created
-	// Updated updated measurement event
+	// Updated updated store event
 	Updated
-	// Deleted deleted measurement event
+	// Deleted deleted store event
 	Deleted
 )
 
-func (e MeasurementEvent) String() string {
+func (e EventType) String() string {
 	return [...]string{"None", "Created", "Updated", "Deleted"}[e]
 }

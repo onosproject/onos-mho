@@ -8,7 +8,7 @@ import (
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
 	"github.com/onosproject/onos-mho/pkg/broker"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
-	"github.com/onosproject/onos-mho/pkg/controller"
+	"github.com/onosproject/onos-mho/pkg/mho"
 	"github.com/onosproject/onos-mho/pkg/rnib"
 
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
@@ -28,7 +28,7 @@ type AppOptions struct {
 
 	RNIBClient rnib.Client
 
-	IndCh chan *controller.E2NodeIndication
+	IndCh chan *mho.E2NodeIndication
 
 	TriggerType e2sm_mho.MhoTriggerType
 }
@@ -94,7 +94,7 @@ func WithRNIBClient(rnibClient rnib.Client) Option {
 	})
 }
 
-func WithIndChan(indCh chan *controller.E2NodeIndication) Option {
+func WithIndChan(indCh chan *mho.E2NodeIndication) Option {
 	return newOption(func(options *Options) {
 		options.App.IndCh = indCh
 	})

@@ -11,7 +11,8 @@ import (
 	"github.com/onosproject/onos-lib-go/pkg/northbound"
 	"github.com/onosproject/onos-mho/pkg/broker"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
-	"github.com/onosproject/onos-mho/pkg/controller"
+	"github.com/onosproject/onos-mho/pkg/mho"
+	nbi "github.com/onosproject/onos-mho/pkg/northbound"
 	"github.com/onosproject/onos-mho/pkg/southbound/e2"
 	"github.com/onosproject/onos-mho/pkg/store"
 	"github.com/onosproject/onos-mho/pkg/uenib"
@@ -40,9 +41,10 @@ func NewManager(config Config) *Manager {
 		log.Warn(err)
 	}
 	subscriptionBroker := broker.NewBroker()
-	mhoStore := store.NewStore()
+	ueStore := store.NewStore()
+	cellStore := store.NewStore()
 
-	indCh := make(chan *controller.E2NodeIndication)
+	indCh := make(chan *mho.E2NodeIndication)
 	ctrlReqChs := make(map[string]chan *e2api.ControlMessage)
 
 	e2Manager, err := e2.NewManager(
@@ -54,7 +56,8 @@ func NewManager(config Config) *Manager {
 		e2.WithBroker(subscriptionBroker),
 		e2.WithIndChan(indCh),
 		e2.WithCtrlReqChs(ctrlReqChs),
-		e2.WithMeasurementStore(mhoStore))
+		e2.WithUeStore(ueStore),
+		e2.WithCellStore(cellStore))
 
 	if err != nil {
 		log.Warn(err)
@@ -64,8 +67,9 @@ func NewManager(config Config) *Manager {
 		appConfig:   appCfg,
 		config:      config,
 		e2Manager:   e2Manager,
-		mhoCtrl:     controller.NewMhoController(appCfg, indCh, ctrlReqChs, mhoStore),
-		mhoStore: mhoStore,
+		mhoCtrl:     mho.NewMhoController(appCfg, indCh, ctrlReqChs, ueStore, cellStore),
+		ueStore: ueStore,
+		cellStore: cellStore,
 	}
 	return manager
 }
@@ -75,8 +79,9 @@ type Manager struct {
 	appConfig   appConfig.Config
 	config      Config
 	e2Manager   e2.Manager
-	mhoCtrl     *controller.MhoCtrl
-	mhoStore store.Store
+	mhoCtrl     *mho.MhoCtrl
+	ueStore store.Store
+	cellStore store.Store
 }
 
 // Run starts the manager and the associated services
@@ -121,7 +126,7 @@ func (m *Manager) startNorthboundServer() error {
 		northbound.SecurityConfig{}))
 
 	//TODO - MHO northbound service
-	//s.AddService(nbi.NewService(m.mhoStore))
+	s.AddService(nbi.NewService(m.ueStore, m.cellStore))
 
 	doneCh := make(chan error)
 	go func() {
@@ -138,11 +143,11 @@ func (m *Manager) startNorthboundServer() error {
 
 func (m *Manager) startUENIBUpdater() {
 	ctx := context.Background()
-	s := uenib.NewUENIBClient(ctx, m.config.CertPath, m.config.KeyPath, m.mhoStore)
+	s := uenib.NewUENIBClient(ctx, m.config.CertPath, m.config.KeyPath, m.ueStore)
 	s.Run(ctx)
 }
 
 // GetMhoStore returns measurement store
-func (m *Manager) GetMhoStore() store.Store {
-	return m.mhoStore
+func (m *Manager) GetUeStore() store.Store {
+	return m.ueStore
 }

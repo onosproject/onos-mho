@@ -8,6 +8,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.1 // indirect
 	github.com/envoyproxy/protoc-gen-validate v0.6.1 // indirect
 	github.com/gogo/protobuf v1.3.2
+	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/mock v1.5.0 // indirect
 	github.com/google/uuid v1.2.0
 	github.com/onosproject/helmit v0.6.13
@@ -24,3 +25,5 @@ require (
 	google.golang.org/grpc v1.39.0
 	google.golang.org/protobuf v1.27.1
 )
+
+replace github.com/onosproject/onos-api/go => ../onos-api/go

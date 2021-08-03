@@ -6,7 +6,7 @@ package monitoring
 
 import (
 	"context"
-	"github.com/onosproject/onos-mho/pkg/controller"
+	"github.com/onosproject/onos-mho/pkg/mho"
 	"github.com/onosproject/onos-mho/pkg/rnib"
 
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
@@ -50,14 +50,14 @@ type Monitor struct {
 	appConfig    appConfig.Config
 	nodeID       topoapi.ID
 	rnibClient   rnib.Client
-	indChan      chan *controller.E2NodeIndication
+	indChan      chan *mho.E2NodeIndication
 	triggerType e2sm_mho.MhoTriggerType
 }
 
 func (m *Monitor) processIndication(ctx context.Context, indication e2api.Indication, nodeID topoapi.ID) error {
 	log.Debugf("processIndication, nodeID: %v, indication: %v ", nodeID, indication)
 
-	m.indChan <- &controller.E2NodeIndication{
+	m.indChan <- &mho.E2NodeIndication{
 		NodeID: string(nodeID),
 		TriggerType: m.triggerType,
 		IndMsg: e2ind.Indication{

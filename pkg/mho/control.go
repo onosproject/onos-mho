@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: LicenseRef-ONF-Member-1.0
 
-package controller
+package mho
 
 import (
 	e2tapi "github.com/onosproject/onos-api/go/onos/e2t/e2"
