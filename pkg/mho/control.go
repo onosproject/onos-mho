@@ -10,6 +10,8 @@ import (
 	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/pdubuilder"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"google.golang.org/protobuf/proto"
+	"github.com/onosproject/rrm-son-lib/pkg/handover"
+	"strconv"
 )
 
 type E2SmMhoControlHandler struct {
@@ -71,5 +73,56 @@ func (c *E2SmMhoControlHandler) CreateMhoControlMessage(servingCgi *e2sm_mho.Cel
 	}
 
 	return []byte{}, err
+
+}
+
+func SendHORequest(ueData *UeData, ho handover.A3HandoverDecision, ctrlReqChan chan *e2api.ControlMessage) {
+	e2NodeID := ueData.E2NodeID
+	servingCGI := ueData.CGI
+	servingPlmnIDBytes := servingCGI.GetNrCgi().GetPLmnIdentity().GetValue()
+	servingNCI := servingCGI.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
+	servingNCILen := servingCGI.GetNrCgi().GetNRcellIdentity().GetValue().GetLen()
+	targetPlmnIDBytes := servingPlmnIDBytes
+	targetNCI, err := strconv.Atoi(ho.TargetCell.GetID().String())
+	if err != nil {
+		panic("bad data")
+	}
+	targetNCILen := 36
+
+	e2smMhoControlHandler := &E2SmMhoControlHandler{
+		NodeID:            e2NodeID,
+		ControlAckRequest: e2tapi.ControlAckRequest_NO_ACK,
+	}
+
+	targetCGI := &e2sm_mho.CellGlobalId{
+		CellGlobalId: &e2sm_mho.CellGlobalId_NrCgi{
+			NrCgi: &e2sm_mho.Nrcgi{
+				PLmnIdentity: &e2sm_mho.PlmnIdentity{
+					Value: targetPlmnIDBytes,
+				},
+				NRcellIdentity: &e2sm_mho.NrcellIdentity{
+					Value: &e2sm_mho.BitString{
+						Value: uint64(targetNCI),
+						Len:   uint32(targetNCILen),
+					},
+				},
+			},
+		},
+	}
+
+	ueIdentity := e2sm_mho.UeIdentity{
+		Value: ueData.UeID,
+	}
+
+	go func() {
+		if e2smMhoControlHandler.ControlHeader, err = e2smMhoControlHandler.CreateMhoControlHeader(servingNCI, servingNCILen, int32(ControlPriority), servingPlmnIDBytes); err == nil {
+			if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, &ueIdentity, targetCGI); err == nil {
+				if controlRequest, err := e2smMhoControlHandler.CreateMhoControlRequest(); err == nil {
+					ctrlReqChan <- controlRequest
+					log.Infof("tx control, e2NodeID:%v, ueID:%v", e2NodeID, ueData.UeID)
+				}
+			}
+		}
+	}()
 
 }

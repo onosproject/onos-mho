@@ -6,7 +6,6 @@ package mho
 
 import (
 	"context"
-	e2tapi "github.com/onosproject/onos-api/go/onos/e2t/e2"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
@@ -14,12 +13,10 @@ import (
 	"github.com/onosproject/onos-mho/pkg/store"
 	"github.com/onosproject/onos-ric-sdk-go/pkg/e2/indication"
 	"github.com/onosproject/rrm-son-lib/pkg/handover"
-	"github.com/onosproject/rrm-son-lib/pkg/model/device"
 	rrmid "github.com/onosproject/rrm-son-lib/pkg/model/id"
-	"github.com/onosproject/rrm-son-lib/pkg/model/measurement"
-	meastype "github.com/onosproject/rrm-son-lib/pkg/model/measurement/type"
 	"google.golang.org/protobuf/proto"
 	"strconv"
+	"sync"
 )
 
 const (
@@ -29,21 +26,20 @@ const (
 var log = logging.GetLogger("mho")
 
 type UeData struct {
-	UeID      string
-	E2NodeID  string
-	CGI       *e2sm_mho.CellGlobalId
-	CGIString string
-	RrcState  string
-	RsrpServing int32
+	UeID          string
+	E2NodeID      string
+	CGI           *e2sm_mho.CellGlobalId
+	CGIString     string
+	RrcState      string
+	RsrpServing   int32
 	RsrpNeighbors map[string]int32
 }
 
 type CellData struct {
 	CGIString              string
-	NumberRrcIdle          int
-	NumberRrcConnected     int
 	CumulativeHandoversIn  int
 	CumulativeHandoversOut int
+	Ues                    map[string]*UeData
 }
 
 type E2NodeIndication struct {
@@ -59,6 +55,8 @@ type MhoCtrl struct {
 	HoCtrl       *HandOverController
 	ueStore      store.Store
 	cellStore    store.Store
+	mu           sync.RWMutex
+	cells        map[string]*CellData
 }
 
 // NewMhoController returns the struct for MHO logic
@@ -70,6 +68,7 @@ func NewMhoController(cfg appConfig.Config, indChan chan *E2NodeIndication, ctrl
 		HoCtrl:       NewHandOverController(cfg),
 		ueStore:      ueStore,
 		cellStore:    cellStore,
+		cells:        make(map[string]*CellData),
 	}
 }
 
@@ -101,7 +100,7 @@ func (c *MhoCtrl) listenIndChan(ctx context.Context) {
 						go c.handlePeriodicReport(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
 					}
 				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat2:
-					go c.handleRrcState(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat2(), e2NodeID)
+					go c.handleRrcState(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat2())
 				default:
 					log.Warnf("Unknown MHO indication message format, indication message: %v", x)
 				}
@@ -124,386 +123,240 @@ func (c *MhoCtrl) listenHandOver(ctx context.Context) {
 }
 
 func (c *MhoCtrl) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
-	log.Infof("rx periodic, e2NodeID:%v, ueID:%v", e2NodeID, ueID)
+	cgi := getCGIFromIndicationHeader(header)
+	log.Infof("rx meas ueID:%v cgi:%v", ueID, cgi)
 
-	u, err := c.ueStore.Get(ctx, ueID)
-	if err != nil {
-		return
-	}
-
-	ueData := u.Value.(UeData)
-
-	// Validate UeID
-	if ueID != ueData.UeID {
-		log.Warn("bad store")
-		return
-	}
-
-	newCGIString := getCGIFromIndicationHeader(header)
-	log.Infof("TRACE: cgi:%v", newCGIString)
-
-	// Validate CGIString
-	if newCGIString != ueData.CGIString {
-		log.Warn("bad store")
+	// get ue from store (create if it does not exist)
+	var ueData *UeData
+	ueData = c.getUe(ctx, ueID)
+	if ueData == nil {
+		ueData = c.createUe(ctx, ueID)
+		c.attachUe(ctx, ueData, cgi)
+	} else if ueData.CGIString != cgi {
 		return
 	}
 
 	// Update RSRP
-	servingNci := getNciFromCellGlobalId(header.GetCgi())
-	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(servingNci, message.MeasReport)
+	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalId(header.GetCgi()), message.MeasReport)
 
-	_, err = c.ueStore.Put(ctx, ueID, ueData)
-	if err != nil {
-		log.Warn(err)
-	}
+	// update store
+	c.setUe(ctx, ueData)
+
 }
 
 func (c *MhoCtrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
+	cgi := getCGIFromIndicationHeader(header)
+	log.Infof("rx meas ueID:%v cgi:%v", ueID, cgi)
 
-	log.Infof("rx measurement, e2NodeID:%v, ueID:%v", e2NodeID, ueID)
-
-	ecgiSCell := rrmid.NewECGI(header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
-
-	scell := device.NewCell(
-		ecgiSCell,
-		meastype.A3OffsetRange(c.HoCtrl.A3OffsetRange),
-		meastype.HysteresisRange(c.HoCtrl.HysteresisRange),
-		meastype.QOffsetRange(c.HoCtrl.CellIndividualOffset),
-		meastype.QOffsetRange(c.HoCtrl.FrequencyOffset),
-		meastype.TimeToTriggerRange(c.HoCtrl.TimeToTrigger))
-
-	cscellList := make([]device.Cell, 0)
-	ueID_int, err := strconv.Atoi(ueID)
-	if err != nil {
-		log.Error(err)
+	// get ue from store (create if it does not exist)
+	var ueData *UeData
+	ueData = c.getUe(ctx, ueID)
+	if ueData == nil {
+		ueData = c.createUe(ctx, ueID)
+		c.attachUe(ctx, ueData, cgi)
+	} else if ueData.CGIString != cgi {
 		return
 	}
-	ue := device.NewUE(rrmid.NewUEID(uint64(ueID_int), uint32(0), header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue()), scell, nil)
 
-	servingNci := getNciFromCellGlobalId(header.GetCgi())
-	RsrpServing, RsrpNeighbors := getRsrpFromMeasReport(servingNci, message.MeasReport)
-
-	//measSCellFound := false
-	for _, measReport := range message.MeasReport {
-		if measReport.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue() == header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue() {
-			ue.GetMeasurements()[ecgiSCell.String()] = measurement.NewMeasEventA3(ecgiSCell, measurement.RSRP(measReport.GetRsrp().GetValue()))
-			//measSCellFound = true
-		} else {
-			ecgiCSCell := rrmid.NewECGI(measReport.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
-			//TODO - Get values from config
-			cscell := device.NewCell(
-				ecgiCSCell,
-				meastype.A3OffsetRange(c.HoCtrl.A3OffsetRange),
-				meastype.HysteresisRange(c.HoCtrl.HysteresisRange),
-				meastype.QOffsetRange(c.HoCtrl.CellIndividualOffset),
-				meastype.QOffsetRange(c.HoCtrl.FrequencyOffset),
-				meastype.TimeToTriggerRange(c.HoCtrl.TimeToTrigger))
-			cscellList = append(cscellList, cscell)
-			ue.GetMeasurements()[ecgiCSCell.String()] = measurement.NewMeasEventA3(ecgiCSCell, measurement.RSRP(measReport.GetRsrp().GetValue()))
-		}
-	}
-
-	// TODO - hack for ran-simulator
-	//if !measSCellFound {
-	//	log.Warnf("serving cell measurement not present in report, e2NodeID:%v", header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
-	//	ecgiSCell := rrmid.NewECGI(header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
-	//	scell := device.NewCell(
-	//		ecgiSCell,
-	//		meastype.A3OffsetRange(c.HoCtrl.A3OffsetRange),
-	//		meastype.HysteresisRange(c.HoCtrl.HysteresisRange),
-	//		meastype.QOffsetRange(c.HoCtrl.CellIndividualOffset),
-	//		meastype.QOffsetRange(c.HoCtrl.FrequencyOffset),
-	//		meastype.TimeToTriggerRange(c.HoCtrl.TimeToTrigger))
-	//	cscellList = append(cscellList, scell)
-	//	ue.GetMeasurements()[ecgiSCell.String()] = measurement.NewMeasEventA3(ecgiSCell, measurement.RSRP(-1000))
-	//}
-
-	ue.SetCSCells(cscellList)
-
-	var ueData *UeData
-	u, err := c.ueStore.Get(ctx, ueID)
-	if err != nil {
-		ueData = &UeData{
-			RsrpNeighbors: make(map[string]int32),
-		}
-	} else {
-		t := u.Value.(UeData)
-		ueData = &t
-	}
-
-	//TODO - don't update store if not needed
-	ueData.UeID = ueID
+	// update info needed by control() later
+	ueData.CGI = header.GetCgi()
 	ueData.E2NodeID = e2NodeID
 
-	ueData.CGI = header.GetCgi()
-	ueData.CGIString = getCGIFromIndicationHeader(header)
-	log.Infof("TRACE: cgi:%v", ueData.CGIString)
+	// update rsrp
+	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalId(header.GetCgi()), message.MeasReport)
 
-	ueData.RsrpServing = RsrpServing
-	for cgi, rsrp := range RsrpNeighbors {
-		ueData.RsrpNeighbors[cgi] = rsrp
-	}
+	// update store
+	c.setUe(ctx, ueData)
 
-	_, err = c.ueStore.Put(ctx, ueID, *ueData)
-	if err != nil {
-		log.Warn(err)
-	}
-
-	c.HoCtrl.A3Handler.Chans.InputChan <- ue
+	// do the real HO processing
+	c.HoCtrl.Input(ctx, header, message)
 
 }
 
-func (c *MhoCtrl) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat2, e2NodeID string) {
+func (c *MhoCtrl) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat2) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
-	newRrcState := message.GetRrcStatus().String()
-	newCGIString := getCGIFromIndicationHeader(header)
-	log.Infof("TRACE: cgi:%v", newCGIString)
+	cgi := getCGIFromIndicationHeader(header)
+	log.Infof("rx rrc ueID:%v cgi:%v", ueID, cgi)
 
+	// get ue from store (create if it does not exist)
 	var ueData *UeData
-	var oldCGIString string
-	u, err := c.ueStore.Get(ctx, ueID)
-	if err != nil {
-		ueData = &UeData{
-			RsrpNeighbors: make(map[string]int32),
-		}
-		ueData.CGIString = newCGIString
-		oldCGIString = newCGIString
-		ueData.RrcState = e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_IDLE)]
-		ueData.UeID = ueID
-	} else {
-		t := u.Value.(UeData)
-		ueData = &t
-		oldCGIString = ueData.CGIString
-	}
-
-	oldRrcState := ueData.RrcState
-
-	if oldRrcState == newRrcState {
-		log.Infof("IGNORE RRC STATE CHANGE - rx rrc, e2NodeID:%v, ueID:%v, newRrcState:%v, oldRrcState", e2NodeID, ueID, newRrcState, oldRrcState)
-		return
-	}
-	log.Infof("rx rrc, e2NodeID:%v, ueID:%v, newRrcState:%v, oldRrcState", e2NodeID, ueID, newRrcState, oldRrcState)
-
-	// Update ue store
-	ueData.UeID = ueID
-	ueData.E2NodeID = e2NodeID
-	ueData.CGI = header.GetCgi()
-
-	ueData.CGIString = newCGIString
-	ueData.RrcState = newRrcState
-	_, err = c.ueStore.Put(ctx, ueID, *ueData)
-	if err != nil {
-		log.Warn(err)
-	}
-
-	// Validate RRC state
-	if oldCGIString != newCGIString {
-		// Idle UE from another cell surfaced
-		if oldRrcState != e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_IDLE)] ||
-			newRrcState != e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_CONNECTED)] {
-			log.Warnf("bad rrc state, %v %v %v %v", oldCGIString, newCGIString, oldRrcState, newRrcState)
-		}
-	} else if oldRrcState == newRrcState {
-		log.Warnf("ignore rrc state")
+	ueData = c.getUe(ctx, ueID)
+	if ueData == nil {
+		ueData = c.createUe(ctx, ueID)
+		c.attachUe(ctx, ueData, cgi)
+	} else if ueData.CGIString != cgi {
 		return
 	}
 
-	//------------------
-	// Update cell store
-	//------------------
+	// set rrc state (takes care of attach/detach as well)
+	newRrcState := message.GetRrcStatus().String()
+	c.setUeRrcState(ctx, ueData, newRrcState, cgi)
 
-	// Get cell data record
-	var newCellData *CellData
-	newCell, err := c.cellStore.Get(ctx, ueData.CGIString)
-
-	// Create data record, if not found
-	if err != nil {
-		newCellData = &CellData{}
-		log.Infof("TRACE: handleRrcState(): cell not found, cgi:%v", ueData.CGIString)
-	} else {
-		t := newCell.Value.(CellData)
-		if t.CGIString != ueData.CGIString {
-			log.Warnf("bad store data: expected:%v, actual:%v", ueData.CGIString, t.CGIString)
-		}
-		newCellData = &t
-	}
-
-	newCellData.CGIString = ueData.CGIString
-
-	if newRrcState == e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_IDLE)] {
-		newCellData.NumberRrcIdle++
-		newCellData.NumberRrcConnected--
-		if newCellData.NumberRrcConnected < 0 {
-			newCellData.NumberRrcConnected = 0
-		}
-	} else if newRrcState == e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_CONNECTED)] {
-		newCellData.NumberRrcConnected++
-
-		if newCGIString == oldCGIString {
-			newCellData.NumberRrcIdle--
-			if newCellData.NumberRrcIdle < 0 {
-				newCellData.NumberRrcIdle = 0
-			}
-		} else {
-			var oldCellData *CellData
-			oldCell, err := c.cellStore.Get(ctx, oldCGIString)
-			if err != nil {
-				oldCellData = &CellData{}
-				log.Infof("TRACE: handleRrcState(): cell not found, cgi:%v", oldCGIString)
-			} else {
-				t := oldCell.Value.(CellData)
-				if t.CGIString != oldCGIString {
-					log.Warnf("bad store data: expected:%v, actual:%v", oldCGIString, t.CGIString)
-				}
-				oldCellData = &t
-			}
-			oldCellData.CGIString = oldCGIString
-			oldCellData.NumberRrcIdle--
-			if oldCellData.NumberRrcIdle < 0 {
-				oldCellData.NumberRrcIdle = 0
-			}
-			_, err = c.cellStore.Put(ctx, oldCGIString, *oldCellData)
-			if err != nil {
-				log.Warn(err)
-			}
-		}
-	}
-	_, err = c.cellStore.Put(ctx, newCellData.CGIString, *newCellData)
-	if err != nil {
-		log.Warn(err)
-	}
+	// update store
+	c.setUe(ctx, ueData)
 
 }
 
 func (c *MhoCtrl) control(ctx context.Context, ho handover.A3HandoverDecision) error {
-	var err error
-
-	// Get ueData from store
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	id := ho.UE.GetID().GetID().(rrmid.UEID).IMSI
 	ueID := strconv.Itoa(int(id))
+
+	ueData := c.getUe(ctx, ueID)
+	if ueData == nil {
+		panic("bad data")
+	}
+
+	// do HO
+	targetCGIString := getCgiFromHO(ueData, ho)
+	c.doHandover(ctx, ueData, targetCGIString)
+
+	// send HO request
+	SendHORequest(ueData, ho, c.CtrlReqChans[ueData.E2NodeID])
+
+	return nil
+
+}
+
+func (c *MhoCtrl) doHandover(ctx context.Context, ueData *UeData, targetCgi string) {
+	servingCgi := ueData.CGIString
+	c.attachUe(ctx, ueData, targetCgi)
+
+	targetCell := c.getCell(ctx, targetCgi)
+	targetCell.CumulativeHandoversOut++
+	c.setCell(ctx, targetCell)
+
+	servingCell := c.getCell(ctx, servingCgi)
+	servingCell.CumulativeHandoversIn++
+	c.setCell(ctx, servingCell)
+}
+
+func (c *MhoCtrl) createUe(ctx context.Context, ueID string) *UeData {
+	if len(ueID) == 0 {
+		panic("bad data")
+	}
+	ueData := &UeData{
+		UeID:          ueID,
+		CGIString:     "",
+		RrcState:      e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_CONNECTED)],
+		RsrpNeighbors: make(map[string]int32),
+	}
+	_, err := c.ueStore.Put(ctx, ueID, *ueData)
+	if err != nil {
+		log.Warn(err)
+	}
+
+	return ueData
+}
+
+func (c *MhoCtrl) getUe(ctx context.Context, ueID string) *UeData {
+	var ueData *UeData
 	u, err := c.ueStore.Get(ctx, ueID)
+	if err != nil || u == nil {
+		return nil
+	}
+	t := u.Value.(UeData)
+	ueData = &t
+	if ueData.UeID != ueID {
+		panic("bad data")
+	}
+
+	return ueData
+}
+
+func (c *MhoCtrl) setUe(ctx context.Context, ueData *UeData) {
+	_, err := c.ueStore.Put(ctx, ueData.UeID, *ueData)
 	if err != nil {
-		log.Warn(err)
-		return err
+		panic("bad data")
 	}
-	ueData := u.Value.(UeData)
+}
 
-	e2NodeID := ueData.E2NodeID
+func (c *MhoCtrl) attachUe(ctx context.Context, ueData *UeData, cgi string) {
+	// detach from current cell
+	c.detachUe(ctx, ueData)
+	// attach to new cell
+	ueData.CGIString = cgi
+	cell := c.getCell(ctx, cgi)
+	if cell == nil {
+		cell = c.createCell(ctx, cgi)
+	}
+	cell.Ues[ueData.UeID] = ueData
+}
 
-	// Gather all ye IDs
-	servingCGI := ueData.CGI
-	servingPlmnIDBytes := servingCGI.GetNrCgi().GetPLmnIdentity().GetValue()
-	servingPlmnID := plmnIDBytesToInt(servingPlmnIDBytes)
-	servingNCI := servingCGI.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
-	servingNCILen := servingCGI.GetNrCgi().GetNRcellIdentity().GetValue().GetLen()
-	targetPlmnIDBytes := servingPlmnIDBytes
-	targetPlmnID := servingPlmnID
-	targetNCI, err := strconv.Atoi(ho.TargetCell.GetID().String())
+func (c *MhoCtrl) detachUe(ctx context.Context, ueData *UeData) {
+	for _, cell := range c.cells {
+		delete(cell.Ues, ueData.UeID)
+	}
+}
+
+func (c *MhoCtrl) setUeRrcState(ctx context.Context, ueData *UeData, newRrcState string, cgi string) {
+	oldRrcState := ueData.RrcState
+
+	if oldRrcState == e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_CONNECTED)] &&
+		newRrcState == e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_IDLE)] {
+		c.detachUe(ctx, ueData)
+	} else if oldRrcState == e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_IDLE)] &&
+		newRrcState == e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_CONNECTED)] {
+		c.attachUe(ctx, ueData, cgi)
+	}
+	ueData.RrcState = newRrcState
+}
+
+func (c *MhoCtrl) createCell(ctx context.Context, cgi string) *CellData {
+	if len(cgi) == 0 {
+		panic("bad data")
+	}
+	cellData := &CellData{
+		CGIString: cgi,
+		Ues:       make(map[string]*UeData),
+	}
+	_, err := c.cellStore.Put(ctx, cgi, *cellData)
 	if err != nil {
-		return err
+		panic("bad data")
 	}
-	targetNCILen := 36
+	c.cells[cellData.CGIString] = cellData
+	return cellData
+}
 
-	e2smMhoControlHandler := &E2SmMhoControlHandler{
-		NodeID:            e2NodeID,
-		ControlAckRequest: e2tapi.ControlAckRequest_NO_ACK,
-	}
-
-	targetCGI := &e2sm_mho.CellGlobalId{
-		CellGlobalId: &e2sm_mho.CellGlobalId_NrCgi{
-			NrCgi: &e2sm_mho.Nrcgi{
-				PLmnIdentity: &e2sm_mho.PlmnIdentity{
-					Value: targetPlmnIDBytes,
-				},
-				NRcellIdentity: &e2sm_mho.NrcellIdentity{
-					Value: &e2sm_mho.BitString{
-						Value: uint64(targetNCI),
-						Len:   uint32(targetNCILen),
-					},
-				},
-			},
-		},
-	}
-
-	ueIdentity := e2sm_mho.UeIdentity{
-		Value: ueID,
-	}
-
-	go func() {
-		if e2smMhoControlHandler.ControlHeader, err = e2smMhoControlHandler.CreateMhoControlHeader(servingNCI, servingNCILen, int32(ControlPriority), servingPlmnIDBytes); err == nil {
-			if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, &ueIdentity, targetCGI); err == nil {
-				if controlRequest, err := e2smMhoControlHandler.CreateMhoControlRequest(); err == nil {
-					c.CtrlReqChans[e2NodeID] <- controlRequest
-					log.Infof("tx control, e2NodeID:%v, ueID:%v", e2NodeID, ueID)
-				}
-			}
-		}
-	}()
-
-	// Update serving cell metrics
+func (c *MhoCtrl) getCell(ctx context.Context, cgi string) *CellData {
 	var cellData *CellData
-	cell, err := c.cellStore.Get(ctx, ueData.CGIString)
-	if err != nil {
-		log.Infof("TRACE: control(): serving cell not found, cgi:%v", ueData.CGIString)
-		cellData = &CellData{}
-	} else {
-		t := cell.Value.(CellData)
-		if t.CGIString != ueData.CGIString {
-			log.Warnf("bad store data: expected:%v, actual:%v", ueData.CGIString, t.CGIString)
-		}
-		cellData = &t
+	cell, err := c.cellStore.Get(ctx, cgi)
+	if err != nil || cell == nil {
+		return nil
 	}
-	cellData.CGIString = ueData.CGIString
-	cellData.CumulativeHandoversOut++
-	cellData.NumberRrcConnected--;
-	if cellData.NumberRrcConnected < 0 {
-		cellData.NumberRrcConnected = 0
+	t := cell.Value.(CellData)
+	if t.CGIString != cgi {
+		panic("bad data")
 	}
-	_, err = c.cellStore.Put(ctx, cellData.CGIString, *cellData)
-	if err != nil {
-		log.Warn(err)
-	}
+	cellData = &t
+	return cellData
+}
 
-	// Update target cell metrics
-	targetCGIString := plmnIDNciToCGI(targetPlmnID, uint64(targetNCI))
-	cell, err = c.cellStore.Get(ctx, targetCGIString)
-	if err != nil {
-		log.Infof("TRACE: control(): target cell not found, cgi:%v", targetCGIString)
-		cellData = &CellData{}
-	} else {
-		t := cell.Value.(CellData)
-		if t.CGIString != targetCGIString {
-			log.Warnf("bad store data: expected:%v, actual:%v", ueData.CGIString, t.CGIString)
-		}
-		cellData = &t
+func (c *MhoCtrl) setCell(ctx context.Context, cellData *CellData) {
+	if len(cellData.CGIString) == 0 {
+		panic("bad data")
 	}
-	cellData.CGIString = targetCGIString
-	cellData.CumulativeHandoversIn++
-	cellData.NumberRrcConnected++
-	_, err = c.cellStore.Put(ctx, cellData.CGIString, *cellData)
+	_, err := c.cellStore.Put(ctx, cellData.CGIString, *cellData)
 	if err != nil {
-		log.Warn(err)
+		panic("bad data")
 	}
-
-	// Update ue store
-	ueData.CGIString = targetCGIString
-	_, err = c.ueStore.Put(ctx, ueID, ueData)
-	if err != nil {
-		log.Warn(err)
-	}
-
-	return err
-
 }
 
 func plmnIDBytesToInt(b []byte) uint64 {
-	return uint64(b[2]) << 16 | uint64(b[1]) << 8 | uint64(b[0])
+	return uint64(b[2])<<16 | uint64(b[1])<<8 | uint64(b[0])
 }
 
 func plmnIDNciToCGI(plmnID uint64, nci uint64) string {
-	return strconv.FormatInt(int64(plmnID<<36 | (nci & 0xfffffffff)), 16)
+	return strconv.FormatInt(int64(plmnID<<36|(nci&0xfffffffff)), 16)
 }
 
 //func getPlmnIDFromIndicationHeader(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1) uint64 {
@@ -531,6 +384,18 @@ func getCGIFromMeasReportItem(measReport *e2sm_mho.E2SmMhoMeasurementReportItem)
 	plmnIDBytes := getPlmnIDBytesFromCellGlobalId(measReport.GetCgi())
 	plmnID := plmnIDBytesToInt(plmnIDBytes)
 	return plmnIDNciToCGI(plmnID, nci)
+}
+
+func getCgiFromHO(ueData *UeData, ho handover.A3HandoverDecision) string {
+	servingCGI := ueData.CGI
+	servingPlmnIDBytes := servingCGI.GetNrCgi().GetPLmnIdentity().GetValue()
+	servingPlmnID := plmnIDBytesToInt(servingPlmnIDBytes)
+	targetPlmnID := servingPlmnID
+	targetNCI, err := strconv.Atoi(ho.TargetCell.GetID().String())
+	if err != nil {
+		panic("bad data")
+	}
+	return plmnIDNciToCGI(targetPlmnID, uint64(targetNCI))
 }
 
 func getRsrpFromMeasReport(servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeasurementReportItem) (int32, map[string]int32) {

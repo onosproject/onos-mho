@@ -46,6 +46,14 @@ type Server struct {
 	cellStore store.Store
 }
 
+func (s *Server) GetMhoParams(ctx context.Context, request *mhoapi.GetMhoParamRequest) (*mhoapi.GetMhoParamResponse, error) {
+	return nil, nil
+}
+
+func (s *Server) SetMhoParams(ctx context.Context, request *mhoapi.SetMhoParamRequest) (*mhoapi.SetMhoParamResponse, error) {
+	return nil, nil
+}
+
 func (s *Server) GetUes(ctx context.Context, request *mhoapi.GetRequest) (*mhoapi.UeList, error) {
 	ch := make(chan *store.Entry)
 	go func() {
@@ -61,6 +69,7 @@ func (s *Server) GetUes(ctx context.Context, request *mhoapi.GetRequest) (*mhoap
 		ueData := e.Value.(mho.UeData)
 		ue := mhoapi.UE {
 			UeId: ueData.UeID,
+			Cgi: ueData.CGIString,
 			RrcState: ueData.RrcState,
 		}
 		ueList.Ues = append(ueList.Ues, &ue)
@@ -83,8 +92,7 @@ func (s *Server) GetCells(ctx context.Context, request *mhoapi.GetRequest) (*mho
 		cellData := e.Value.(mho.CellData)
 		cell := mhoapi.Cell {
 			Cgi: cellData.CGIString,
-			NumberRrcIdle: int64(cellData.NumberRrcIdle),
-			NumberRrcConnected: int64(cellData.NumberRrcConnected),
+			NumUes: int64(len(cellData.Ues)),
 			CumulativeHandoversIn: int64(cellData.CumulativeHandoversIn),
 			CumulativeHandoversOut: int64(cellData.CumulativeHandoversOut),
 		}
@@ -93,27 +101,3 @@ func (s *Server) GetCells(ctx context.Context, request *mhoapi.GetRequest) (*mho
 	return &cellList, nil
 
 }
-
-//func (s *Server) ListUes(request *mhoapi.UeRequest, server mhoapi.Mho_ListUesServer) error {
-//	ch := make(chan *store.Entry)
-//	go func() {
-//		err := s.store.Entries(context.Background(), ch)
-//		if err != nil {
-//			log.Error(err)
-//		}
-//	}()
-//
-//	for e := range ch {
-//		ueData := e.Value.(mho.UeData)
-//		ue := mhoapi.Ue{
-//			UeId: ueData.UeID,
-//			RrcState: ueData.RrcState,
-//		}
-//		if err := server.Send(&ue); err != nil {
-//			return err
-//		}
-//	}
-//
-//	return nil
-//}
-//
