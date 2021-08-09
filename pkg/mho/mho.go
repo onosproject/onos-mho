@@ -281,15 +281,18 @@ func (c *MhoCtrl) setUe(ctx context.Context, ueData *UeData) {
 }
 
 func (c *MhoCtrl) attachUe(ctx context.Context, ueData *UeData, cgi string) {
-	// detach from current cell
+	// detach ue from current cell
 	c.detachUe(ctx, ueData)
-	// attach to new cell
+
+	// attach ue to new cell
 	ueData.CGIString = cgi
+	c.setUe(ctx, ueData)
 	cell := c.getCell(ctx, cgi)
 	if cell == nil {
 		cell = c.createCell(ctx, cgi)
 	}
 	cell.Ues[ueData.UeID] = ueData
+	c.setCell(ctx, cell)
 }
 
 func (c *MhoCtrl) detachUe(ctx context.Context, ueData *UeData) {
