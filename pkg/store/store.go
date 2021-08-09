@@ -16,17 +16,17 @@ import (
 	"github.com/onosproject/onos-lib-go/pkg/errors"
 )
 
-var log = logging.GetLogger("store", "measurements")
+var log = logging.GetLogger("store", "records")
 
 // Store mho metrics store interface
 type Store interface {
-	Put(ctx context.Context, key Key, value interface{}) (*Entry, error)
+	Put(ctx context.Context, key string, value interface{}) (*Entry, error)
 
 	// Get gets a metric store entry based on a given key
-	Get(ctx context.Context, key Key) (*Entry, error)
+	Get(ctx context.Context, key string) (*Entry, error)
 
 	// Delete deletes an entry based on a given key
-	Delete(ctx context.Context, key Key) error
+	Delete(ctx context.Context, key string) error
 
 	// Entries list all of the metric store entries
 	Entries(ctx context.Context, ch chan<- *Entry) error
@@ -36,7 +36,7 @@ type Store interface {
 }
 
 type store struct {
-	measurements map[Key]*Entry
+	records map[string]*Entry
 	mu           sync.RWMutex
 	watchers     *Watchers
 }
@@ -45,7 +45,7 @@ type store struct {
 func NewStore() Store {
 	watchers := NewWatchers()
 	return &store{
-		measurements: make(map[Key]*Entry),
+		records: make(map[string]*Entry),
 		watchers:     watchers,
 	}
 }
@@ -54,12 +54,12 @@ func (s *store) Entries(ctx context.Context, ch chan<- *Entry) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if len(s.measurements) == 0 {
+	if len(s.records) == 0 {
 		close(ch)
-		return fmt.Errorf("no measurements entries stored")
+		return fmt.Errorf("no records entries stored")
 	}
 
-	for _, entry := range s.measurements {
+	for _, entry := range s.records {
 		ch <- entry
 	}
 
@@ -67,23 +67,23 @@ func (s *store) Entries(ctx context.Context, ch chan<- *Entry) error {
 	return nil
 }
 
-func (s *store) Delete(ctx context.Context, key Key) error {
+func (s *store) Delete(ctx context.Context, key string) error {
 	// TODO check the key and make sure it is not empty
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.measurements, key)
+	delete(s.records, key)
 	return nil
 
 }
 
-func (s *store) Put(ctx context.Context, key Key, value interface{}) (*Entry, error) {
+func (s *store) Put(ctx context.Context, key string, value interface{}) (*Entry, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	entry := &Entry{
 		Key:   key,
 		Value: value,
 	}
-	s.measurements[key] = entry
+	s.records[key] = entry
 	s.watchers.Send(Event{
 		Key:   key,
 		Value: entry,
@@ -93,10 +93,10 @@ func (s *store) Put(ctx context.Context, key Key, value interface{}) (*Entry, er
 
 }
 
-func (s *store) Get(ctx context.Context, key Key) (*Entry, error) {
+func (s *store) Get(ctx context.Context, key string) (*Entry, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if v, ok := s.measurements[key]; ok {
+	if v, ok := s.records[key]; ok {
 		return v, nil
 	}
 	return nil, errors.New(errors.NotFound, "the measurement entry does not exist")

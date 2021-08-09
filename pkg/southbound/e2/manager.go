@@ -7,7 +7,7 @@ package e2
 import (
 	"context"
 	"fmt"
-	"github.com/onosproject/onos-mho/pkg/controller"
+	"github.com/onosproject/onos-mho/pkg/mho"
 	"google.golang.org/protobuf/proto"
 	"strings"
 
@@ -49,7 +49,7 @@ type Manager struct {
 	serviceModel ServiceModelOptions
 	appConfig    appConfig.Config
 	streams      broker.Broker
-	indChan      chan *controller.E2NodeIndication
+	indChan      chan *mho.E2NodeIndication
 	CtrlReqChs map[string]chan *e2api.ControlMessage
 
 }

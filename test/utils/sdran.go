@@ -60,7 +60,7 @@ func CreateSdranRelease(c *input.Context) (*helm.HelmRelease, error) {
 
 // VerifyNumUesInStore...
 func VerifyNumUesInStore(ctx context.Context, t *testing.T, mgr *manager.Manager) error {
-	store := mgr.GetMhoStore()
+	store := mgr.GetUeStore()
 	numUes := 0
 	var err error
 
@@ -91,7 +91,7 @@ func numUesInStore(t *testing.T, s store.Store) (int, error) {
 
 	numUes := 0
 	for e := range ch {
-		t.Logf("ueID: %v", e.Key.UeID)
+		t.Logf("ueID: %v", e.Key)
 		numUes++
 	}
 

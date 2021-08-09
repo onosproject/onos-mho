@@ -8,7 +8,7 @@ import (
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	"github.com/onosproject/onos-mho/pkg/broker"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
-	"github.com/onosproject/onos-mho/pkg/controller"
+	"github.com/onosproject/onos-mho/pkg/mho"
 	"github.com/onosproject/onos-mho/pkg/store"
 )
 
@@ -31,11 +31,13 @@ type AppOptions struct {
 
 	Broker broker.Broker
 
-	IndCh chan *controller.E2NodeIndication
+	IndCh chan *mho.E2NodeIndication
 
 	CtrlReqChs map[string]chan *e2api.ControlMessage
 
-	MeasurementStore store.Store
+	UeStore store.Store
+
+	CellStore store.Store
 }
 
 // E2TServiceOptions are the options for a E2T service
@@ -150,7 +152,7 @@ func WithBroker(broker broker.Broker) Option {
 }
 
 // WithIndChan ...
-func WithIndChan(indCh chan *controller.E2NodeIndication) Option {
+func WithIndChan(indCh chan *mho.E2NodeIndication) Option {
 	return newOption(func(options *Options) {
 		options.App.IndCh = indCh
 	})
@@ -163,9 +165,16 @@ func WithCtrlReqChs(ctrlReqChs map[string]chan *e2api.ControlMessage) Option {
 	})
 }
 
-// WithMeasurementStore sets measurement store
-func WithMeasurementStore(measurementStore store.Store) Option {
+// WithUeStore sets measurement store
+func WithUeStore(ueStore store.Store) Option {
 	return newOption(func(options *Options) {
-		options.App.MeasurementStore = measurementStore
+		options.App.UeStore = ueStore
+	})
+}
+
+// WithCellStore sets measurement store
+func WithCellStore(cellStore store.Store) Option {
+	return newOption(func(options *Options) {
+		options.App.CellStore = cellStore
 	})
 }
