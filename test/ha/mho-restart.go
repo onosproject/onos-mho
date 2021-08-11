@@ -90,7 +90,6 @@ func (s *TestSuite) TestMhoRestart(t *testing.T) {
 	for i := 1; i <= 5; i++ {
 		// Crash onos-mho
 		e2tPod := FindPodWithPrefix(t, "onos-mho")
-		t.Logf("Crash %v", prefix)
 		CrashPodOrFail(t, e2tPod)
 
 		//TODO
