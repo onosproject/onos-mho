@@ -6,13 +6,15 @@ package utils
 
 import (
 	"context"
-	//"github.com/onosproject/onos-api/go/onos/mho"
+	"testing"
+
+	"github.com/onosproject/onos-api/go/onos/mho"
 	"github.com/onosproject/onos-ric-sdk-go/pkg/utils/creds"
-	//"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	//"testing"
 )
+
 
 // MHOServiceAddress defines the address and port for connections to the MHO service
 const MHOServiceAddress = "onos-mho:5150"
@@ -31,10 +33,10 @@ func ConnectMHOServiceHost() (*grpc.ClientConn, error) {
 }
 
 // GetMHOClient returns an SDK subscription client
-//func GetMHOClient(t *testing.T) mho.MHOClient {
-//	conn, err := ConnectMHOServiceHost()
-//	assert.NoError(t, err)
-//	assert.NotNil(t, conn)
-//
-//	return mho.NewMHOClient(conn)
-//}
+func GetMhoClient(t *testing.T) mho.MhoClient {
+	conn, err := ConnectMHOServiceHost()
+	assert.NoError(t, err)
+	assert.NotNil(t, conn)
+
+	return mho.NewMhoClient(conn)
+}
