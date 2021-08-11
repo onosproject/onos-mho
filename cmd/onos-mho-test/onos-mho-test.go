@@ -7,12 +7,12 @@ package main
 import (
 	"github.com/onosproject/helmit/pkg/registry"
 	"github.com/onosproject/helmit/pkg/test"
-	//"github.com/onosproject/onos-mho/test/ha"
+	"github.com/onosproject/onos-mho/test/ha"
 	"github.com/onosproject/onos-mho/test/mho"
 )
 
 func main() {
 	registry.RegisterTestSuite("mho", &mho.TestSuite{})
-	//registry.RegisterTestSuite("ha", &ha.TestSuite{})
+	registry.RegisterTestSuite("ha", &ha.TestSuite{})
 	test.Main()
 }
