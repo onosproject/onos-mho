@@ -6,7 +6,6 @@ package store
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/onosproject/onos-lib-go/pkg/logging"
@@ -53,11 +52,6 @@ func NewStore() Store {
 func (s *store) Entries(ctx context.Context, ch chan<- *Entry) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	if len(s.records) == 0 {
-		close(ch)
-		return fmt.Errorf("no records entries stored")
-	}
 
 	for _, entry := range s.records {
 		ch <- entry

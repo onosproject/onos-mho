@@ -99,6 +99,7 @@ func (m *Manager) Start() error {
 		defer cancel()
 		err := m.watchE2Connections(ctx)
 		if err != nil {
+			log.Error(err)
 			return
 		}
 	}()
@@ -239,14 +240,16 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 			e2NodeID := relation.Relation.TgtEntityID
 			cellIDs, err := m.rnibClient.GetCells(ctx, e2NodeID)
 			if err != nil {
+				log.Warn(err)
 				return err
 			}
 			for _, cellID := range cellIDs {
-				log.Debugf("cell removed, e2NodeID:%v, cellID:%v", e2NodeID, cellID.CellGlobalID.GetValue())
+				log.Infof("cell removed, e2NodeID:%v, cellID:%v", e2NodeID, cellID.CellGlobalID.GetValue())
 			}
 		}
 	}
 
+	log.Warnf("topo client has lost connection to topo")
 	return nil
 }
 
