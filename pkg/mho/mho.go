@@ -59,6 +59,9 @@ type MhoCtrl struct {
 	cells        map[string]*CellData
 }
 
+const a3Report = "a3"
+const periodicReport = "periodic"
+
 // NewMhoController returns the struct for MHO logic
 func NewMhoController(cfg appConfig.Config, indChan chan *E2NodeIndication, ctrlReqChs map[string]chan *e2api.ControlMessage, ueStore store.Store, cellStore store.Store) *MhoCtrl {
 	log.Info("Init MhoController")
@@ -95,9 +98,9 @@ func (c *MhoCtrl) listenIndChan(ctx context.Context) {
 				switch x := indMessage.E2SmMhoIndicationMessage.(type) {
 				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat1:
 					if indMsg.TriggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT {
-						go c.handleMeasReport(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+						go c.handleMeasReport(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID, a3Report)
 					} else if indMsg.TriggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC {
-						go c.handlePeriodicReport(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+						go c.handleMeasReport(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID, periodicReport)
 					}
 				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat2:
 					go c.handleRrcState(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat2())
@@ -122,12 +125,12 @@ func (c *MhoCtrl) listenHandOver(ctx context.Context) {
 	}
 }
 
-func (c *MhoCtrl) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+func (c *MhoCtrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string, reportType string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
 	cgi := getCGIFromIndicationHeader(header)
-	log.Infof("rx meas ueID:%v cgi:%v", ueID, cgi)
+	log.Infof("rx %v ueID:%v cgi:%v", reportType, ueID, cgi)
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
@@ -139,34 +142,6 @@ func (c *MhoCtrl) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2S
 		return
 	}
 
-	// Update RSRP
-	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalId(header.GetCgi()), message.MeasReport)
-
-	// update store
-	c.setUe(ctx, ueData)
-
-}
-
-func (c *MhoCtrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	ueID := message.GetUeId().GetValue()
-	cgi := getCGIFromIndicationHeader(header)
-	log.Infof("rx meas ueID:%v cgi:%v", ueID, cgi)
-
-	// get ue from store (create if it does not exist)
-	var ueData *UeData
-	ueData = c.getUe(ctx, ueID)
-	if ueData == nil {
-		ueData = c.createUe(ctx, ueID)
-		c.attachUe(ctx, ueData, cgi)
-	} else if ueData.CGIString != cgi {
-		return
-	}
-
-	// update info needed by control() later
-	ueData.CGI = header.GetCgi()
-	ueData.E2NodeID = e2NodeID
 
 	// update rsrp
 	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalId(header.GetCgi()), message.MeasReport)
@@ -174,8 +149,13 @@ func (c *MhoCtrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMho
 	// update store
 	c.setUe(ctx, ueData)
 
-	// do the real HO processing
-	c.HoCtrl.Input(ctx, header, message)
+	// If A3 report, then send for HO processing
+	if reportType == a3Report {
+		// update info needed by control() later
+		ueData.CGI = header.GetCgi()
+		ueData.E2NodeID = e2NodeID
+		c.HoCtrl.Input(ctx, header, message)
+	}
 
 }
 
@@ -362,11 +342,6 @@ func plmnIDNciToCGI(plmnID uint64, nci uint64) string {
 	return strconv.FormatInt(int64(plmnID<<36|(nci&0xfffffffff)), 16)
 }
 
-//func getPlmnIDFromIndicationHeader(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1) uint64 {
-//	plmnIDBytes := header.GetCgi().GetNrCgi().GetPLmnIdentity().GetValue()
-//	return plmnIDBytesToInt(plmnIDBytes)
-//}
-
 func getNciFromCellGlobalId(cellGlobalId *e2sm_mho.CellGlobalId) uint64 {
 	return cellGlobalId.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
 }
@@ -404,7 +379,6 @@ func getCgiFromHO(ueData *UeData, ho handover.A3HandoverDecision) string {
 func getRsrpFromMeasReport(servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeasurementReportItem) (int32, map[string]int32) {
 	var rsrpServing int32
 	rsrpNeighbors := make(map[string]int32)
-
 	for _, measReportItem := range measReport {
 		if getNciFromCellGlobalId(measReportItem.GetCgi()) == servingNci {
 			rsrpServing = measReportItem.GetRsrp().GetValue()
@@ -413,6 +387,5 @@ func getRsrpFromMeasReport(servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeas
 			rsrpNeighbors[CGIString] = measReportItem.GetRsrp().GetValue()
 		}
 	}
-
 	return rsrpServing, rsrpNeighbors
 }
