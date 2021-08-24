@@ -40,7 +40,6 @@ type Client struct {
 	client toposdk.Client
 }
 
-
 // E2NodeIDs lists all of connected E2 nodes
 func (c *Client) E2NodeIDs(ctx context.Context) ([]topoapi.ID, error) {
 	objects, err := c.client.List(ctx, toposdk.WithListFilters(getControlRelationFilter()))

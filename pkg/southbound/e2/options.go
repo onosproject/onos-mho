@@ -14,9 +14,9 @@ import (
 
 // Options E2 client options
 type Options struct {
-	E2TService E2TServiceOptions
+	E2TService ServiceOptions
 
-	E2SubService E2SubServiceOptions
+	E2SubService SubServiceOptions
 
 	ServiceModel ServiceModelOptions
 
@@ -40,16 +40,16 @@ type AppOptions struct {
 	CellStore store.Store
 }
 
-// E2TServiceOptions are the options for a E2T service
-type E2TServiceOptions struct {
+// ServiceOptions are the options for a E2T service
+type ServiceOptions struct {
 	// Host is the service host
 	Host string
 	// Port is the service port
 	Port int
 }
 
-// E2SubServiceOptions are the options for E2sub service
-type E2SubServiceOptions struct {
+// SubServiceOptions are the options for E2sub service
+type SubServiceOptions struct {
 	// Host is the service host
 	Host string
 	// Port is the service port

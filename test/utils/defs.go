@@ -32,5 +32,4 @@ const (
 	TotalNumCells = 6
 	//TotalNumE2Nodes is the total number of E2 Nodes
 	TotalNumE2Nodes = 2
-
 )

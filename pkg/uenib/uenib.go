@@ -31,8 +31,8 @@ func NewUENIBClient(ctx context.Context, certPath string, keyPath string, store 
 		log.Error(err)
 	}
 	return &client{
-		client:           uenib.NewUEServiceClient(conn),
-		store: store,
+		client: uenib.NewUEServiceClient(conn),
+		store:  store,
 	}
 }
 
@@ -49,8 +49,8 @@ type Client interface {
 }
 
 type client struct {
-	client           uenib.UEServiceClient
-	store store.Store
+	client uenib.UEServiceClient
+	store  store.Store
 }
 
 func (c *client) WatchMhoStore(ctx context.Context, ch chan store.Event) {
@@ -95,7 +95,7 @@ func (c *client) createUENIBUpdateReq(entry *store.Entry) *uenib.UpdateUERequest
 	uenibObj.Aspects["RRCState"] = &types.Any{
 		TypeUrl: "RRCState",
 		// TODO
-		Value:   []byte(ueData.RrcState),
+		Value: []byte(ueData.RrcState),
 	}
 
 	uenibObj.Aspects["CGI"] = &types.Any{

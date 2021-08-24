@@ -48,8 +48,8 @@ type E2NodeIndication struct {
 	IndMsg      indication.Indication
 }
 
-// MhoCtrl is the controller for MHO
-type MhoCtrl struct {
+// Ctrl is the controller for MHO
+type Ctrl struct {
 	IndChan      chan *E2NodeIndication
 	CtrlReqChans map[string]chan *e2api.ControlMessage
 	HoCtrl       *HandOverController
@@ -60,9 +60,9 @@ type MhoCtrl struct {
 }
 
 // NewMhoController returns the struct for MHO logic
-func NewMhoController(cfg appConfig.Config, indChan chan *E2NodeIndication, ctrlReqChs map[string]chan *e2api.ControlMessage, ueStore store.Store, cellStore store.Store) *MhoCtrl {
+func NewMhoController(cfg appConfig.Config, indChan chan *E2NodeIndication, ctrlReqChs map[string]chan *e2api.ControlMessage, ueStore store.Store, cellStore store.Store) *Ctrl {
 	log.Info("Init MhoController")
-	return &MhoCtrl{
+	return &Ctrl{
 		IndChan:      indChan,
 		CtrlReqChans: ctrlReqChs,
 		HoCtrl:       NewHandOverController(cfg),
@@ -73,14 +73,14 @@ func NewMhoController(cfg appConfig.Config, indChan chan *E2NodeIndication, ctrl
 }
 
 // Run starts to listen Indication message and then save the result to its struct
-func (c *MhoCtrl) Run(ctx context.Context) {
+func (c *Ctrl) Run(ctx context.Context) {
 	log.Info("Start MhoController")
 	go c.HoCtrl.Run()
 	go c.listenIndChan(ctx)
 	c.listenHandOver(ctx)
 }
 
-func (c *MhoCtrl) listenIndChan(ctx context.Context) {
+func (c *Ctrl) listenIndChan(ctx context.Context) {
 	var err error
 	for indMsg := range c.IndChan {
 
@@ -112,7 +112,7 @@ func (c *MhoCtrl) listenIndChan(ctx context.Context) {
 	}
 }
 
-func (c *MhoCtrl) listenHandOver(ctx context.Context) {
+func (c *Ctrl) listenHandOver(ctx context.Context) {
 	for hoDecision := range c.HoCtrl.HandoverHandler.Chans.OutputChan {
 		go func(hoDecision handover.A3HandoverDecision) {
 			if err := c.control(ctx, hoDecision); err != nil {
@@ -122,7 +122,7 @@ func (c *MhoCtrl) listenHandOver(ctx context.Context) {
 	}
 }
 
-func (c *MhoCtrl) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+func (c *Ctrl) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
@@ -140,14 +140,14 @@ func (c *MhoCtrl) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2S
 	}
 
 	// Update RSRP
-	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalId(header.GetCgi()), message.MeasReport)
+	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
 
 	// update store
 	c.setUe(ctx, ueData)
 
 }
 
-func (c *MhoCtrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
+func (c *Ctrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
@@ -169,7 +169,7 @@ func (c *MhoCtrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMho
 	ueData.E2NodeID = e2NodeID
 
 	// update rsrp
-	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalId(header.GetCgi()), message.MeasReport)
+	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
 
 	// update store
 	c.setUe(ctx, ueData)
@@ -179,7 +179,7 @@ func (c *MhoCtrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMho
 
 }
 
-func (c *MhoCtrl) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat2) {
+func (c *Ctrl) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat2) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
@@ -205,7 +205,7 @@ func (c *MhoCtrl) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMhoIn
 
 }
 
-func (c *MhoCtrl) control(ctx context.Context, ho handover.A3HandoverDecision) error {
+func (c *Ctrl) control(ctx context.Context, ho handover.A3HandoverDecision) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	id := ho.UE.GetID().GetID().(rrmid.UEID).IMSI
@@ -227,7 +227,7 @@ func (c *MhoCtrl) control(ctx context.Context, ho handover.A3HandoverDecision) e
 
 }
 
-func (c *MhoCtrl) doHandover(ctx context.Context, ueData *UeData, targetCgi string) {
+func (c *Ctrl) doHandover(ctx context.Context, ueData *UeData, targetCgi string) {
 	servingCgi := ueData.CGIString
 	c.attachUe(ctx, ueData, targetCgi)
 
@@ -240,7 +240,7 @@ func (c *MhoCtrl) doHandover(ctx context.Context, ueData *UeData, targetCgi stri
 	c.setCell(ctx, servingCell)
 }
 
-func (c *MhoCtrl) createUe(ctx context.Context, ueID string) *UeData {
+func (c *Ctrl) createUe(ctx context.Context, ueID string) *UeData {
 	if len(ueID) == 0 {
 		panic("bad data")
 	}
@@ -258,7 +258,7 @@ func (c *MhoCtrl) createUe(ctx context.Context, ueID string) *UeData {
 	return ueData
 }
 
-func (c *MhoCtrl) getUe(ctx context.Context, ueID string) *UeData {
+func (c *Ctrl) getUe(ctx context.Context, ueID string) *UeData {
 	var ueData *UeData
 	u, err := c.ueStore.Get(ctx, ueID)
 	if err != nil || u == nil {
@@ -273,14 +273,14 @@ func (c *MhoCtrl) getUe(ctx context.Context, ueID string) *UeData {
 	return ueData
 }
 
-func (c *MhoCtrl) setUe(ctx context.Context, ueData *UeData) {
+func (c *Ctrl) setUe(ctx context.Context, ueData *UeData) {
 	_, err := c.ueStore.Put(ctx, ueData.UeID, *ueData)
 	if err != nil {
 		panic("bad data")
 	}
 }
 
-func (c *MhoCtrl) attachUe(ctx context.Context, ueData *UeData, cgi string) {
+func (c *Ctrl) attachUe(ctx context.Context, ueData *UeData, cgi string) {
 	// detach ue from current cell
 	c.detachUe(ctx, ueData)
 
@@ -295,13 +295,13 @@ func (c *MhoCtrl) attachUe(ctx context.Context, ueData *UeData, cgi string) {
 	c.setCell(ctx, cell)
 }
 
-func (c *MhoCtrl) detachUe(ctx context.Context, ueData *UeData) {
+func (c *Ctrl) detachUe(ctx context.Context, ueData *UeData) {
 	for _, cell := range c.cells {
 		delete(cell.Ues, ueData.UeID)
 	}
 }
 
-func (c *MhoCtrl) setUeRrcState(ctx context.Context, ueData *UeData, newRrcState string, cgi string) {
+func (c *Ctrl) setUeRrcState(ctx context.Context, ueData *UeData, newRrcState string, cgi string) {
 	oldRrcState := ueData.RrcState
 
 	if oldRrcState == e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_CONNECTED)] &&
@@ -314,7 +314,7 @@ func (c *MhoCtrl) setUeRrcState(ctx context.Context, ueData *UeData, newRrcState
 	ueData.RrcState = newRrcState
 }
 
-func (c *MhoCtrl) createCell(ctx context.Context, cgi string) *CellData {
+func (c *Ctrl) createCell(ctx context.Context, cgi string) *CellData {
 	if len(cgi) == 0 {
 		panic("bad data")
 	}
@@ -330,7 +330,7 @@ func (c *MhoCtrl) createCell(ctx context.Context, cgi string) *CellData {
 	return cellData
 }
 
-func (c *MhoCtrl) getCell(ctx context.Context, cgi string) *CellData {
+func (c *Ctrl) getCell(ctx context.Context, cgi string) *CellData {
 	var cellData *CellData
 	cell, err := c.cellStore.Get(ctx, cgi)
 	if err != nil || cell == nil {
@@ -344,7 +344,7 @@ func (c *MhoCtrl) getCell(ctx context.Context, cgi string) *CellData {
 	return cellData
 }
 
-func (c *MhoCtrl) setCell(ctx context.Context, cellData *CellData) {
+func (c *Ctrl) setCell(ctx context.Context, cellData *CellData) {
 	if len(cellData.CGIString) == 0 {
 		panic("bad data")
 	}
@@ -367,24 +367,24 @@ func plmnIDNciToCGI(plmnID uint64, nci uint64) string {
 //	return plmnIDBytesToInt(plmnIDBytes)
 //}
 
-func getNciFromCellGlobalId(cellGlobalId *e2sm_mho.CellGlobalId) uint64 {
-	return cellGlobalId.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
+func getNciFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) uint64 {
+	return cellGlobalID.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
 }
 
-func getPlmnIDBytesFromCellGlobalId(cellGlobalId *e2sm_mho.CellGlobalId) []byte {
-	return cellGlobalId.GetNrCgi().GetPLmnIdentity().GetValue()
+func getPlmnIDBytesFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) []byte {
+	return cellGlobalID.GetNrCgi().GetPLmnIdentity().GetValue()
 }
 
 func getCGIFromIndicationHeader(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1) string {
-	nci := getNciFromCellGlobalId(header.GetCgi())
-	plmnIDBytes := getPlmnIDBytesFromCellGlobalId(header.GetCgi())
+	nci := getNciFromCellGlobalID(header.GetCgi())
+	plmnIDBytes := getPlmnIDBytesFromCellGlobalID(header.GetCgi())
 	plmnID := plmnIDBytesToInt(plmnIDBytes)
 	return plmnIDNciToCGI(plmnID, nci)
 }
 
 func getCGIFromMeasReportItem(measReport *e2sm_mho.E2SmMhoMeasurementReportItem) string {
-	nci := getNciFromCellGlobalId(measReport.GetCgi())
-	plmnIDBytes := getPlmnIDBytesFromCellGlobalId(measReport.GetCgi())
+	nci := getNciFromCellGlobalID(measReport.GetCgi())
+	plmnIDBytes := getPlmnIDBytesFromCellGlobalID(measReport.GetCgi())
 	plmnID := plmnIDBytesToInt(plmnIDBytes)
 	return plmnIDNciToCGI(plmnID, nci)
 }
@@ -406,7 +406,7 @@ func getRsrpFromMeasReport(servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeas
 	rsrpNeighbors := make(map[string]int32)
 
 	for _, measReportItem := range measReport {
-		if getNciFromCellGlobalId(measReportItem.GetCgi()) == servingNci {
+		if getNciFromCellGlobalID(measReportItem.GetCgi()) == servingNci {
 			rsrpServing = measReportItem.GetRsrp().GetValue()
 		} else {
 			CGIString := getCGIFromMeasReportItem(measReportItem)

@@ -19,7 +19,7 @@ var log = logging.GetLogger("northbound")
 // NewService ...
 func NewService(ueStore store.Store, cellStore store.Store) service.Service {
 	return &Service{
-		ueStore: ueStore,
+		ueStore:   ueStore,
 		cellStore: cellStore,
 	}
 }
@@ -27,14 +27,14 @@ func NewService(ueStore store.Store, cellStore store.Store) service.Service {
 // Service ...
 type Service struct {
 	service.Service
-	ueStore store.Store
+	ueStore   store.Store
 	cellStore store.Store
 }
 
 // Register registers the Service with the gRPC server.
 func (s Service) Register(r *grpc.Server) {
 	server := &Server{
-		ueStore: s.ueStore,
+		ueStore:   s.ueStore,
 		cellStore: s.cellStore,
 	}
 	mhoapi.RegisterMhoServer(r, server)
@@ -42,7 +42,7 @@ func (s Service) Register(r *grpc.Server) {
 
 // Server implements the MHO gRPC service for administrative facilities.
 type Server struct {
-	ueStore store.Store
+	ueStore   store.Store
 	cellStore store.Store
 }
 
@@ -67,9 +67,9 @@ func (s *Server) GetUes(ctx context.Context, request *mhoapi.GetRequest) (*mhoap
 
 	for e := range ch {
 		ueData := e.Value.(mho.UeData)
-		ue := mhoapi.UE {
-			UeId: ueData.UeID,
-			Cgi: ueData.CGIString,
+		ue := mhoapi.UE{
+			UeId:     ueData.UeID,
+			Cgi:      ueData.CGIString,
 			RrcState: ueData.RrcState,
 		}
 		ueList.Ues = append(ueList.Ues, &ue)
@@ -90,10 +90,10 @@ func (s *Server) GetCells(ctx context.Context, request *mhoapi.GetRequest) (*mho
 
 	for e := range ch {
 		cellData := e.Value.(mho.CellData)
-		cell := mhoapi.Cell {
-			Cgi: cellData.CGIString,
-			NumUes: int64(len(cellData.Ues)),
-			CumulativeHandoversIn: int64(cellData.CumulativeHandoversIn),
+		cell := mhoapi.Cell{
+			Cgi:                    cellData.CGIString,
+			NumUes:                 int64(len(cellData.Ues)),
+			CumulativeHandoversIn:  int64(cellData.CumulativeHandoversIn),
 			CumulativeHandoversOut: int64(cellData.CumulativeHandoversOut),
 		}
 		cellList.Cells = append(cellList.Cells, &cell)
