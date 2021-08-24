@@ -6,9 +6,9 @@ package mho
 
 import (
 	"context"
+	"github.com/onosproject/onos-lib-go/pkg/certs"
 	"github.com/onosproject/onos-mho/pkg/manager"
 	"github.com/onosproject/onos-mho/test/utils"
-	"github.com/onosproject/onos-lib-go/pkg/certs"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

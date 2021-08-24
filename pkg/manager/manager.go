@@ -64,11 +64,11 @@ func NewManager(config Config) *Manager {
 	}
 
 	manager := &Manager{
-		appConfig:   appCfg,
-		config:      config,
-		e2Manager:   e2Manager,
-		mhoCtrl:     mho.NewMhoController(appCfg, indCh, ctrlReqChs, ueStore, cellStore),
-		ueStore: ueStore,
+		appConfig: appCfg,
+		config:    config,
+		e2Manager: e2Manager,
+		mhoCtrl:   mho.NewMhoController(appCfg, indCh, ctrlReqChs, ueStore, cellStore),
+		ueStore:   ueStore,
 		cellStore: cellStore,
 	}
 	return manager
@@ -76,11 +76,11 @@ func NewManager(config Config) *Manager {
 
 // Manager is a manager for the MHO xAPP service
 type Manager struct {
-	appConfig   appConfig.Config
-	config      Config
-	e2Manager   e2.Manager
-	mhoCtrl     *mho.MhoCtrl
-	ueStore store.Store
+	appConfig appConfig.Config
+	config    Config
+	e2Manager e2.Manager
+	mhoCtrl   *mho.Ctrl
+	ueStore   store.Store
 	cellStore store.Store
 }
 

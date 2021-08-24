@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-
 // MHOServiceAddress defines the address and port for connections to the MHO service
 const MHOServiceAddress = "onos-mho:5150"
 

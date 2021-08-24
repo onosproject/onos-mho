@@ -36,17 +36,17 @@ type Store interface {
 }
 
 type store struct {
-	records map[string]*Entry
-	mu           sync.RWMutex
-	watchers     *Watchers
+	records  map[string]*Entry
+	mu       sync.RWMutex
+	watchers *Watchers
 }
 
 // NewStore creates new store
 func NewStore() Store {
 	watchers := NewWatchers()
 	return &store{
-		records: make(map[string]*Entry),
-		watchers:     watchers,
+		records:  make(map[string]*Entry),
+		watchers: watchers,
 	}
 }
 

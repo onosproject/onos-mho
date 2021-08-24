@@ -50,8 +50,7 @@ type Manager struct {
 	appConfig    appConfig.Config
 	streams      broker.Broker
 	indChan      chan *mho.E2NodeIndication
-	CtrlReqChs map[string]chan *e2api.ControlMessage
-
+	CtrlReqChs   map[string]chan *e2api.ControlMessage
 }
 
 // NewManager creates a new subscription manager
@@ -83,9 +82,9 @@ func NewManager(opts ...Option) (Manager, error) {
 			Name:    options.ServiceModel.Name,
 			Version: options.ServiceModel.Version,
 		},
-		appConfig:   options.App.Config,
-		streams:     options.App.Broker,
-		indChan: options.App.IndCh,
+		appConfig:  options.App.Config,
+		streams:    options.App.Broker,
+		indChan:    options.App.IndCh,
 		CtrlReqChs: options.App.CtrlReqChs,
 	}, nil
 
@@ -217,7 +216,7 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)
 			e2NodeID := relation.Relation.TgtEntityID
 			m.CtrlReqChs[string(e2NodeID)] = make(chan *e2api.ControlMessage)
-			triggers := make (map[e2sm_mho.MhoTriggerType]bool)
+			triggers := make(map[e2sm_mho.MhoTriggerType]bool)
 			triggers[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC] = m.appConfig.GetPeriodic()
 			triggers[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT] = m.appConfig.GetUponRcvMeas()
 			triggers[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_CHANGE_RRC_STATUS] = m.appConfig.GetUponChangeRrcStatus()

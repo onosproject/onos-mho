@@ -9,23 +9,23 @@ import (
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/pdubuilder"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
-	"google.golang.org/protobuf/proto"
 	"github.com/onosproject/rrm-son-lib/pkg/handover"
+	"google.golang.org/protobuf/proto"
 	"strconv"
 )
 
 type E2SmMhoControlHandler struct {
-	NodeID              string
-	ControlMessage      []byte
-	ControlHeader       []byte
-	ControlAckRequest   e2tapi.ControlAckRequest
+	NodeID            string
+	ControlMessage    []byte
+	ControlHeader     []byte
+	ControlAckRequest e2tapi.ControlAckRequest
 }
 
 func (c *E2SmMhoControlHandler) CreateMhoControlRequest() (*e2api.ControlMessage, error) {
 	return &e2api.ControlMessage{
-		Header: c.ControlHeader,
+		Header:  c.ControlHeader,
 		Payload: c.ControlMessage,
-		}, nil
+	}, nil
 }
 
 func (c *E2SmMhoControlHandler) CreateMhoControlHeader(cellID uint64, cellIDLen uint32, priority int32, plmnID []byte) ([]byte, error) {

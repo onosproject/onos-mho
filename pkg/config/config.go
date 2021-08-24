@@ -18,10 +18,10 @@ import (
 var log = logging.GetLogger("config")
 
 const (
-	ReportingPeriodConfigPath = "reportingPeriod"
-	PeriodicConfigPath = "periodic"
-	UponRcvMeasConfigPath = "uponRcvMeasReport"
-	UponChangeRrcStatusConfigPath = "uponChangeRrcStatus"
+	ReportingPeriodConfigPath      = "reportingPeriod"
+	PeriodicConfigPath             = "periodic"
+	UponRcvMeasConfigPath          = "uponRcvMeasReport"
+	UponChangeRrcStatusConfigPath  = "uponChangeRrcStatus"
 	A3OffsetRangeConfigPath        = "A3OffsetRange"
 	HysteresisRangeConfigPath      = "HysteresisRange"
 	CellIndividualOffsetConfigPath = "CellIndividualOffset"
