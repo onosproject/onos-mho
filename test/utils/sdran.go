@@ -77,7 +77,7 @@ func VerifyUes(ctx context.Context, t *testing.T, mgr *manager.Manager) bool {
 				ticker.Stop()
 				return true
 			}
-			tickerCount += 1
+			tickerCount++
 		case <-ctx.Done():
 			return false
 		}
@@ -131,7 +131,7 @@ func VerifyHO(ctx context.Context, t *testing.T, mgr *manager.Manager, ueID stri
 				t.Logf("New serving cell CGI:%v", newCgi)
 				return true
 			}
-			tickerCount += 1
+			tickerCount++
 		case <- ctx.Done():
 			ticker.Stop()
 			return false
