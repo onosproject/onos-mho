@@ -127,7 +127,7 @@ func (c *Ctrl) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMh
 	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
 	cgi := getCGIFromIndicationHeader(header)
-	log.Infof("rx meas ueID:%v cgi:%v", ueID, cgi)
+	log.Infof("rx periodic ueID:%v cgi:%v", ueID, cgi)
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
@@ -152,7 +152,7 @@ func (c *Ctrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoInd
 	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
 	cgi := getCGIFromIndicationHeader(header)
-	log.Infof("rx meas ueID:%v cgi:%v", ueID, cgi)
+	log.Infof("rx a3 ueID:%v cgi:%v", ueID, cgi)
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
