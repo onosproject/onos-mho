@@ -6,7 +6,6 @@ package store
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/onosproject/onos-lib-go/pkg/logging"
@@ -18,20 +17,20 @@ import (
 
 var log = logging.GetLogger("store", "records")
 
-// Store mho metrics store interface
+// Store mho store interface
 type Store interface {
 	Put(ctx context.Context, key string, value interface{}) (*Entry, error)
 
-	// Get gets a metric store entry based on a given key
+	// Get gets a store entry based on a given key
 	Get(ctx context.Context, key string) (*Entry, error)
 
 	// Delete deletes an entry based on a given key
 	Delete(ctx context.Context, key string) error
 
-	// Entries list all of the metric store entries
+	// Entries list all of the store entries
 	Entries(ctx context.Context, ch chan<- *Entry) error
 
-	// Watch measurement store changes
+	// Watch store changes
 	Watch(ctx context.Context, ch chan<- Event) error
 }
 
@@ -53,11 +52,6 @@ func NewStore() Store {
 func (s *store) Entries(ctx context.Context, ch chan<- *Entry) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	if len(s.records) == 0 {
-		close(ch)
-		return fmt.Errorf("no records entries stored")
-	}
 
 	for _, entry := range s.records {
 		ch <- entry
@@ -99,7 +93,7 @@ func (s *store) Get(ctx context.Context, key string) (*Entry, error) {
 	if v, ok := s.records[key]; ok {
 		return v, nil
 	}
-	return nil, errors.New(errors.NotFound, "the measurement entry does not exist")
+	return nil, errors.New(errors.NotFound, "the entry does not exist")
 }
 
 func (s *store) Watch(ctx context.Context, ch chan<- Event) error {

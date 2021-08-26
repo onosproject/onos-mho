@@ -6,11 +6,11 @@ package utils
 
 import (
 	"context"
-	"fmt"
 	"github.com/onosproject/helmit/pkg/helm"
 	"github.com/onosproject/helmit/pkg/input"
 	"github.com/onosproject/helmit/pkg/kubernetes"
 	"github.com/onosproject/onos-mho/pkg/manager"
+	"github.com/onosproject/onos-mho/pkg/mho"
 	"github.com/onosproject/onos-mho/pkg/store"
 	"github.com/onosproject/onos-test/pkg/onostest"
 	"github.com/stretchr/testify/assert"
@@ -49,38 +49,123 @@ func CreateSdranRelease(c *input.Context) (*helm.HelmRelease, error) {
 		Set("import.onos-config.enabled", false).
 		Set("import.onos-topo.enabled", true).
 		Set("import.ran-simulator.enabled", true).
-		Set("import.onos-pci.enabled", false).
-		Set("import.onos-kpimon.enabled", false).
 		Set("import.onos-mho.enabled", false).
-		Set("onos-uenib.image.tag", "latest").
+		Set("onos-mho.image.tag", "latest").
+		Set("ran-simulator.image.tag", "latest").
+		Set("ran-simulator.pci.modelName", "two-cell-two-node-model").
 		Set("global.image.registry", registry)
 
 	return sdran, nil
 }
 
-// VerifyNumUesInStore...
-func VerifyNumUesInStore(ctx context.Context, t *testing.T, mgr *manager.Manager) error {
+// VerifyUes ...
+func VerifyUes(ctx context.Context, t *testing.T, mgr *manager.Manager) bool {
 	store := mgr.GetUeStore()
 	numUes := 0
-	var err error
 
-	select {
-	case <-ctx.Done():
-		numUes, err = numUesInStore(t, store)
-	case <-time.After(TestInterval):
-		numUes, err = numUesInStore(t, store)
+	ticker := time.NewTicker(1 * time.Second)
+	tickerCount := 0
+	for {
+		select {
+		case <- ticker.C:
+			if tickerCount >= 120 {
+				ticker.Stop()
+				return false
+			}
+			numUes = numUesInStore(t, store)
+			if numUes == TotalNumUEs {
+				ticker.Stop()
+				return true
+			}
+			tickerCount += 1
+		case <-ctx.Done():
+			return false
+		}
 	}
-	if err != nil {
-		return err
-	}
-	if numUes >= TotalNumUEs {
-		return nil
-	}
-	return fmt.Errorf("%s", "Test failed - the number of UEs does not matched")
 }
 
-func numUesInStore(t *testing.T, s store.Store) (int, error) {
-	// TODO
+// GetRandomUe gets a random UE
+func GetRandomUe(ctx context.Context, t *testing.T, mgr *manager.Manager) mho.UeData {
+	ueStore := mgr.GetUeStore()
+	ch := make(chan *store.Entry)
+	go func() {
+		err := ueStore.Entries(context.Background(), ch)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	var ueData mho.UeData
+	for e := range ch {
+		ueID := e.Key
+		ueData = e.Value.(mho.UeData)
+		t.Logf("ueID: %v, cgi:%v", ueID, ueData.CGIString)
+		break
+	}
+
+	return ueData
+}
+
+// VerifyHO
+func VerifyHO(ctx context.Context, t *testing.T, mgr *manager.Manager, ueID string) bool {
+	oldCgi := getCgi(ctx, t, mgr, ueID)
+
+	t.Logf("Old serving cell CGI:%v", oldCgi)
+
+	if len(oldCgi) == 0 {
+		t.Log("Invalid CGI for old serving cell")
+		return false
+	}
+
+	ticker := time.NewTicker(1 * time.Second)
+	tickerCount := 0
+	for {
+		select {
+		case <- ticker.C:
+			if tickerCount >= 60 {
+				ticker.Stop()
+				return false
+			}
+			newCgi := getCgi(ctx, t, mgr, ueID)
+			if oldCgi != newCgi {
+				t.Logf("New serving cell CGI:%v", newCgi)
+				return true
+			}
+			tickerCount += 1
+		case <- ctx.Done():
+			ticker.Stop()
+			return false
+		}
+	}
+}
+
+func getCgi(ctx context.Context, t *testing.T, mgr *manager.Manager, ueID string) string {
+	var cgi string
+	ue := GetUe(ctx, t, mgr, ueID)
+	if ue != nil {
+		cgi = ue.CGIString
+	}
+	return cgi
+}
+
+// GetUe
+func GetUe(ctx context.Context, t *testing.T, mgr *manager.Manager, ueID string) *mho.UeData {
+	ueStore := mgr.GetUeStore()
+	ue, err := ueStore.Get(ctx, ueID)
+	if err != nil || ue == nil {
+		t.Logf("Failed getting UE %v from store, %v", ueID, err)
+		return nil
+	}
+	u := ue.Value.(mho.UeData)
+	ueData := &u
+	if ueData.UeID != ueID {
+		t.Logf("bad data UE %v", ueID)
+		return nil
+	}
+	return ueData
+}
+
+func numUesInStore(t *testing.T, s store.Store) int {
 	ch := make(chan *store.Entry)
 	go func() {
 		err := s.Entries(context.Background(), ch)
@@ -91,11 +176,13 @@ func numUesInStore(t *testing.T, s store.Store) (int, error) {
 
 	numUes := 0
 	for e := range ch {
-		t.Logf("ueID: %v", e.Key)
+		ueID := e.Key
+		ueData := e.Value.(mho.UeData)
+		t.Logf("ueID: %v, cgi:%v", ueID, ueData.CGIString)
 		numUes++
 	}
 
-	return numUes, nil
+	return numUes
 }
 
 // CreateRanSimulatorWithNameOrDie creates a simulator and fails the test if the creation returned an error

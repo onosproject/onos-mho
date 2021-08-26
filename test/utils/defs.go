@@ -27,7 +27,7 @@ const (
 	TestInterval = 60 * time.Second
 
 	// TotalNumUEs is the total number of UEs
-	TotalNumUEs = 10
+	TotalNumUEs = 1
 	//TotalNumCells is the total number of cells
 	TotalNumCells = 6
 	//TotalNumE2Nodes is the total number of E2 Nodes

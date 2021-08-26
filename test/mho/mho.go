@@ -35,10 +35,14 @@ func (s *TestSuite) TestMhoSm(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), utils.TestTimeout)
 	defer cancel()
 
-	t.Log("TestMhoSm 1")
-	err = utils.VerifyNumUesInStore(ctx, t, mgr)
-	t.Log("TestMhoSm 2")
-	assert.NoError(t, err)
+	ok := utils.VerifyUes(ctx, t, mgr)
+	assert.True(t, ok)
+
+	ueData := utils.GetRandomUe(ctx, t, mgr)
+	assert.NotNil(t, ueData)
+
+	ok = utils.VerifyHO(ctx, t, mgr, ueData.UeID)
+	assert.True(t, ok)
 
 	t.Log("MHO suite test passed")
 }
