@@ -67,7 +67,7 @@ func VerifyUes(ctx context.Context, t *testing.T, mgr *manager.Manager) bool {
 	tickerCount := 0
 	for {
 		select {
-		case <- ticker.C:
+		case <-ticker.C:
 			if tickerCount >= 120 {
 				ticker.Stop()
 				return false
@@ -121,7 +121,7 @@ func VerifyHO(ctx context.Context, t *testing.T, mgr *manager.Manager, ueID stri
 	tickerCount := 0
 	for {
 		select {
-		case <- ticker.C:
+		case <-ticker.C:
 			if tickerCount >= 60 {
 				ticker.Stop()
 				return false
@@ -132,7 +132,7 @@ func VerifyHO(ctx context.Context, t *testing.T, mgr *manager.Manager, ueID stri
 				return true
 			}
 			tickerCount++
-		case <- ctx.Done():
+		case <-ctx.Done():
 			ticker.Stop()
 			return false
 		}
