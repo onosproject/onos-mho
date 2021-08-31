@@ -46,3 +46,7 @@ $ onos ransim get cells
 $ onos ransim get ues
 $ onos ransim get ue <ueID>
 ```
+
+### RANSim models
+The generic **model.yaml** model, which simulates UEs moving on randomly generated routes, can be used with onos-mho to test handovers. Alternatively, the **two-cell-two-node-model.yaml** model can be used to test onos-mho handover functionality in a more controlled and deterministic manner. Refer to documentation on [RANSim models](https://github.com/onosproject/ran-simulator/blob/master/docs/model.md) for further information.
+
