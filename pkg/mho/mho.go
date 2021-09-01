@@ -15,9 +15,9 @@ import (
 	"github.com/onosproject/rrm-son-lib/pkg/handover"
 	rrmid "github.com/onosproject/rrm-son-lib/pkg/model/id"
 	"google.golang.org/protobuf/proto"
+	"reflect"
 	"strconv"
 	"sync"
-	"reflect"
 )
 
 const (
@@ -144,7 +144,7 @@ func (c *Ctrl) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMh
 
 	rsrpServing, rsrpNeighbors := getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
 
-	if !newUe && rsrpServing == ueData.RsrpServing  && reflect.DeepEqual(rsrpNeighbors, ueData.RsrpNeighbors) {
+	if !newUe && rsrpServing == ueData.RsrpServing && reflect.DeepEqual(rsrpNeighbors, ueData.RsrpNeighbors) {
 		return
 	}
 
