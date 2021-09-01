@@ -56,7 +56,7 @@ type client struct {
 func (c *client) WatchMhoStore(ctx context.Context, ch chan store.Event) {
 	for e := range ch {
 		entry := e.Value.(*store.Entry)
-		c.UpdateMhoResult(ctx, entry)
+		go c.UpdateMhoResult(ctx, entry)
 	}
 }
 

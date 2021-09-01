@@ -15,6 +15,7 @@ import (
 	"github.com/onosproject/rrm-son-lib/pkg/handover"
 	rrmid "github.com/onosproject/rrm-son-lib/pkg/model/id"
 	"google.golang.org/protobuf/proto"
+	"reflect"
 	"strconv"
 	"sync"
 )
@@ -131,18 +132,24 @@ func (c *Ctrl) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMh
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
+	newUe := false
 	ueData = c.getUe(ctx, ueID)
 	if ueData == nil {
 		ueData = c.createUe(ctx, ueID)
 		c.attachUe(ctx, ueData, cgi)
+		newUe = true
 	} else if ueData.CGIString != cgi {
 		return
 	}
 
-	// Update RSRP
-	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
+	rsrpServing, rsrpNeighbors := getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
+
+	if !newUe && rsrpServing == ueData.RsrpServing && reflect.DeepEqual(rsrpNeighbors, ueData.RsrpNeighbors) {
+		return
+	}
 
 	// update store
+	ueData.RsrpServing, ueData.RsrpNeighbors = rsrpServing, rsrpNeighbors
 	c.setUe(ctx, ueData)
 
 }
