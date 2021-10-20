@@ -775,8 +775,8 @@ github.com/onosproject/helmit v0.6.17 h1:Or/QVsay7P3O9wJKiJl4ezjZg9M82dNQ+58d7dC
 github.com/onosproject/helmit v0.6.17/go.mod h1:wdfAbTUnL2lBvr8PObslX5Hf3ZZnm1d5kBVy1hMJzYo=
 github.com/onosproject/onos-api/go v0.7.95/go.mod h1:CaFf0659DTSP/8LAwuKv9p9/xFPcx7fmcxC/dlSi8qo=
 github.com/onosproject/onos-api/go v0.7.103/go.mod h1:CaFf0659DTSP/8LAwuKv9p9/xFPcx7fmcxC/dlSi8qo=
-github.com/onosproject/onos-api/go v0.7.106 h1:/GQtBVeZ8s+L5oOt3+cXKMvT1TAJBnCTdG3V49pT9Sg=
-github.com/onosproject/onos-api/go v0.7.106/go.mod h1:CaFf0659DTSP/8LAwuKv9p9/xFPcx7fmcxC/dlSi8qo=
+github.com/onosproject/onos-api/go v0.7.109 h1:zePg1PNUmBGXqGwZcdUyXDWTgWWT/ZvPVWHsgwzoT+Y=
+github.com/onosproject/onos-api/go v0.7.109/go.mod h1:CaFf0659DTSP/8LAwuKv9p9/xFPcx7fmcxC/dlSi8qo=
 github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho v0.7.66 h1:qRXNZv1selgTOXO1fk3pkRR933a1CH/1A+p7CVYGRAg=
 github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho v0.7.66/go.mod h1:mq3lewzeO6nPzaHvgfAqz64bKrvB07TQ3F3E8HTyLMQ=
 github.com/onosproject/onos-lib-go v0.7.10/go.mod h1:/QjMn+Lb+vxZfnCFLtoxhwHAAuHQnRjjOj3qCbcknhQ=
@@ -784,9 +784,9 @@ github.com/onosproject/onos-lib-go v0.7.18/go.mod h1:yEu+qDh+z1G6b9clPAjDLQNnBll
 github.com/onosproject/onos-lib-go v0.7.21/go.mod h1:RbD0kyWQaFqcNlBNGInP1yRGcCVq1gaQsCTtkOptNK0=
 github.com/onosproject/onos-lib-go v0.7.22 h1:lfbG97eyp9GqcDWgoIueCsX8mnfEDNZB/NSwLpsr/hs=
 github.com/onosproject/onos-lib-go v0.7.22/go.mod h1:RbD0kyWQaFqcNlBNGInP1yRGcCVq1gaQsCTtkOptNK0=
-github.com/onosproject/onos-proxy v0.0.4/go.mod h1:a4bDfZH58v63WoOIWBfL0zEbkoPFaFA6U6yHdZmG8pc=
-github.com/onosproject/onos-ric-sdk-go v0.7.32 h1:6z/HwceqDjCenwShGkbVPkw27ZiU4Q8zu3cLSm2O1as=
-github.com/onosproject/onos-ric-sdk-go v0.7.32/go.mod h1:kc7Qn7hm6oryN1z+WZpX6EnqROWoYVp8o348aSXnj7M=
+github.com/onosproject/onos-proxy v0.0.5/go.mod h1:a4bDfZH58v63WoOIWBfL0zEbkoPFaFA6U6yHdZmG8pc=
+github.com/onosproject/onos-ric-sdk-go v0.7.33 h1:0nysX8/hvNGWqpkRthYqjmfArC1ta/5b02qelvZ4hIA=
+github.com/onosproject/onos-ric-sdk-go v0.7.33/go.mod h1:pZjS3lgwbeKkA87ze2bwnaX4U5JHffXX4SDgh6HOVxc=
 github.com/onosproject/onos-test v0.6.5 h1:Agj90+x8Qclg92iDN7OUvof1qzr6YCHqHXGVxxAiyaQ=
 github.com/onosproject/onos-test v0.6.5/go.mod h1:xucBzO2j77G6U/HgQApqMlv7YbDWj69guwDRQyB7bUc=
 github.com/onosproject/rrm-son-lib v0.0.2 h1:u13pZLzAiY+PRSfmey67NBKsqJgiNeSCl+DqOBkEwcE=
