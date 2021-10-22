@@ -784,6 +784,7 @@ github.com/onosproject/onos-lib-go v0.7.18/go.mod h1:yEu+qDh+z1G6b9clPAjDLQNnBll
 github.com/onosproject/onos-lib-go v0.7.21/go.mod h1:RbD0kyWQaFqcNlBNGInP1yRGcCVq1gaQsCTtkOptNK0=
 github.com/onosproject/onos-lib-go v0.7.22 h1:lfbG97eyp9GqcDWgoIueCsX8mnfEDNZB/NSwLpsr/hs=
 github.com/onosproject/onos-lib-go v0.7.22/go.mod h1:RbD0kyWQaFqcNlBNGInP1yRGcCVq1gaQsCTtkOptNK0=
+github.com/onosproject/onos-proxy v0.0.5 h1:GPQO1hmsKqDKMML3/JiIpvDaH0HwuSyoUXw62skoTLE=
 github.com/onosproject/onos-proxy v0.0.5/go.mod h1:a4bDfZH58v63WoOIWBfL0zEbkoPFaFA6U6yHdZmG8pc=
 github.com/onosproject/onos-ric-sdk-go v0.7.33 h1:0nysX8/hvNGWqpkRthYqjmfArC1ta/5b02qelvZ4hIA=
 github.com/onosproject/onos-ric-sdk-go v0.7.33/go.mod h1:pZjS3lgwbeKkA87ze2bwnaX4U5JHffXX4SDgh6HOVxc=
