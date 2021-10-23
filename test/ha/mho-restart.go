@@ -95,6 +95,6 @@ func (s *TestSuite) TestMhoRestart(t *testing.T) {
 		resp = GetUesOrFail(t)
 		assert.NotNil(t, resp)
 	}
-
+	assert.NoError(t, sim.Uninstall())
 	t.Log("MHO restart test passed")
 }
