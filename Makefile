@@ -20,7 +20,7 @@ test: build deps linters license_check_member_only
 	go test -race github.com/onosproject/onos-mho/cmd/...
 
 jenkins-test:  # @HELP run the unit tests and source code validation producing a junit style report for Jenkins
-jenkins-test: build-tools deps license_check_member_only linters
+jenkins-test: deps license_check_member_only linters
 	TEST_PACKAGES=github.com/onosproject/onos-mho/... ./build/build-tools/build/jenkins/make-unit
 
 buflint: #@HELP run the "buf check lint" command on the proto files in 'api'
@@ -67,7 +67,7 @@ all: build images
 publish: # @HELP publish version on github and dockerhub
 	./build/build-tools/publish-version ${VERSION} onosproject/onos-mho
 
-jenkins-publish: build-tools jenkins-tools # @HELP Jenkins calls this to publish artifacts
+jenkins-publish: jenkins-tools # @HELP Jenkins calls this to publish artifacts
 	./build/bin/push-images
 	./build/build-tools/release-merge-commit
 
