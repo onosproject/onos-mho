@@ -1,4 +1,5 @@
 build/_output/onos-mho
+build/build-tools
 
 # Jenkins stuff
 *report*.xml
