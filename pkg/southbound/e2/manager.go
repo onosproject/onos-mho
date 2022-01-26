@@ -23,8 +23,8 @@ import (
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
 
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
-	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/pdubuilder"
-	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
+	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/pdubuilder"
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-mho/pkg/rnib"
 	e2client "github.com/onosproject/onos-ric-sdk-go/pkg/e2/v1beta1"
@@ -277,10 +277,11 @@ func (m *Manager) createEventTrigger(triggerType e2sm_mho.MhoTriggerType) ([]byt
 	} else {
 		reportPeriodMs = 0
 	}
-	e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmMhoEventTriggerDefinition(triggerType, reportPeriodMs)
+	e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmMhoEventTriggerDefinition(triggerType)
 	if err != nil {
 		return []byte{}, err
 	}
+	e2smRcEventTriggerDefinition.GetEventDefinitionFormats().GetEventDefinitionFormat1().SetReportingPeriodInMs(reportPeriodMs)
 
 	err = e2smRcEventTriggerDefinition.Validate()
 	if err != nil {

@@ -5,8 +5,9 @@
 package mho
 
 import (
+	"bytes"
 	"context"
-	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
 	"github.com/onosproject/rrm-son-lib/pkg/handover"
 	measurement2 "github.com/onosproject/rrm-son-lib/pkg/measurement"
@@ -60,7 +61,7 @@ func (h *HandOverController) Run() {
 func (h *HandOverController) Input(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1) {
 	ueID := message.GetUeId().GetValue()
 
-	ecgiSCell := rrmid.NewECGI(header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
+	ecgiSCell := rrmid.NewECGI(BitStringToUint64(header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue(), int(header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetLen())))
 	scell := device.NewCell(
 		ecgiSCell,
 		meastype.A3OffsetRange(h.A3OffsetRange),
@@ -70,18 +71,21 @@ func (h *HandOverController) Input(ctx context.Context, header *e2sm_mho.E2SmMho
 		meastype.TimeToTriggerRange(h.TimeToTrigger))
 	cscellList := make([]device.Cell, 0)
 
-	ueidInt, err := strconv.Atoi(ueID)
+	// Not completely correct conversion - may be a source of problems
+	ueidInt, err := strconv.Atoi(string(ueID))
 	if err != nil {
 		log.Error(err)
 		return
 	}
-	ue := device.NewUE(rrmid.NewUEID(uint64(ueidInt), uint32(0), header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue()), scell, nil)
+	ue := device.NewUE(rrmid.NewUEID(uint64(ueidInt), uint32(0),
+		BitStringToUint64(header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue(), int(header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetLen()))),
+		scell, nil)
 
 	for _, measReport := range message.MeasReport {
-		if measReport.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue() == header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue() {
+		if bytes.Equal(measReport.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue(), header.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue()) {
 			ue.GetMeasurements()[ecgiSCell.String()] = measurement.NewMeasEventA3(ecgiSCell, measurement.RSRP(measReport.GetRsrp().GetValue()))
 		} else {
-			ecgiCSCell := rrmid.NewECGI(measReport.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue())
+			ecgiCSCell := rrmid.NewECGI(BitStringToUint64(measReport.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetValue(), int(measReport.GetCgi().GetNrCgi().GetNRcellIdentity().GetValue().GetLen())))
 			cscell := device.NewCell(
 				ecgiCSCell,
 				meastype.A3OffsetRange(h.A3OffsetRange),
