@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019-present Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+
 export CGO_ENABLED=1
 export GO111MODULE=on
 
@@ -15,12 +19,12 @@ build-tools:=$(shell if [ ! -d "./build/build-tools" ]; then cd build && git clo
 include ./build/build-tools/make/onf-common.mk
 
 test: # @HELP run the unit tests and source code validation
-test: build deps linters license_check_member_only
+test: build deps linters license_check_apache
 	go test -race github.com/onosproject/onos-mho/pkg/...
 	go test -race github.com/onosproject/onos-mho/cmd/...
 
 jenkins-test:  # @HELP run the unit tests and source code validation producing a junit style report for Jenkins
-jenkins-test: deps license_check_member_only linters
+jenkins-test: deps license_check_apache linters
 	TEST_PACKAGES=github.com/onosproject/onos-mho/... ./build/build-tools/build/jenkins/make-unit
 
 buflint: #@HELP run the "buf check lint" command on the proto files in 'api'
