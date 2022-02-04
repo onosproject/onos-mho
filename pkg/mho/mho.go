@@ -7,7 +7,7 @@ package mho
 import (
 	"context"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
-	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
 	"github.com/onosproject/onos-mho/pkg/store"
@@ -133,9 +133,11 @@ func (c *Ctrl) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMh
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
 	newUe := false
-	ueData = c.getUe(ctx, ueID)
+	// Not completely correct conversion of UeID - may be a source of problems
+	ueData = c.getUe(ctx, string(ueID))
 	if ueData == nil {
-		ueData = c.createUe(ctx, ueID)
+		// Not completely correct conversion of UeID - may be a source of problems
+		ueData = c.createUe(ctx, string(ueID))
 		c.attachUe(ctx, ueData, cgi)
 		newUe = true
 	} else if ueData.CGIString != cgi {
@@ -163,9 +165,11 @@ func (c *Ctrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoInd
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
-	ueData = c.getUe(ctx, ueID)
+	// Not completely correct conversion of UeID - may be a source of problems
+	ueData = c.getUe(ctx, string(ueID))
 	if ueData == nil {
-		ueData = c.createUe(ctx, ueID)
+		// Not completely correct conversion of UeID - may be a source of problems
+		ueData = c.createUe(ctx, string(ueID))
 		c.attachUe(ctx, ueData, cgi)
 	} else if ueData.CGIString != cgi {
 		return
@@ -195,9 +199,11 @@ func (c *Ctrl) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMhoIndic
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
-	ueData = c.getUe(ctx, ueID)
+	// Not completely correct conversion of UeID - may be a source of problems
+	ueData = c.getUe(ctx, string(ueID))
 	if ueData == nil {
-		ueData = c.createUe(ctx, ueID)
+		// Not completely correct conversion of UeID - may be a source of problems
+		ueData = c.createUe(ctx, string(ueID))
 		c.attachUe(ctx, ueData, cgi)
 	} else if ueData.CGIString != cgi {
 		return
@@ -375,7 +381,7 @@ func plmnIDNciToCGI(plmnID uint64, nci uint64) string {
 //}
 
 func getNciFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) uint64 {
-	return cellGlobalID.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
+	return BitStringToUint64(cellGlobalID.GetNrCgi().GetNRcellIdentity().GetValue().GetValue(), int(cellGlobalID.GetNrCgi().GetNRcellIdentity().GetValue().GetLen()))
 }
 
 func getPlmnIDBytesFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) []byte {
