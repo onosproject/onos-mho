@@ -7,8 +7,9 @@ package mho
 import (
 	e2tapi "github.com/onosproject/onos-api/go/onos/e2t/e2"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
-	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/pdubuilder"
-	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
+	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/pdubuilder"
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
+	"github.com/onosproject/onos-lib-go/api/asn1/v1/asn1"
 	"github.com/onosproject/rrm-son-lib/pkg/handover"
 	"google.golang.org/protobuf/proto"
 	"strconv"
@@ -28,12 +29,12 @@ func (c *E2SmMhoControlHandler) CreateMhoControlRequest() (*e2api.ControlMessage
 	}, nil
 }
 
-func (c *E2SmMhoControlHandler) CreateMhoControlHeader(cellID uint64, cellIDLen uint32, priority int32, plmnID []byte) ([]byte, error) {
-	eci := &e2sm_mho.BitString{
+func (c *E2SmMhoControlHandler) CreateMhoControlHeader(cellID []byte, cellIDLen uint32, priority int32, plmnID []byte) ([]byte, error) {
+	eci := &asn1.BitString{
 		Value: cellID,
 		Len:   cellIDLen,
 	}
-	cgi, err := pdubuilder.CreateCellGlobalIDNrCgi(plmnID, eci)
+	cgi, err := pdubuilder.CreateCellGlobalIDNrCGI(plmnID, eci)
 	log.Debugf("eci: %v", eci)
 	log.Debugf("cgi: %v", cgi)
 	if err != nil {
@@ -101,8 +102,8 @@ func SendHORequest(ueData *UeData, ho handover.A3HandoverDecision, ctrlReqChan c
 					Value: targetPlmnIDBytes,
 				},
 				NRcellIdentity: &e2sm_mho.NrcellIdentity{
-					Value: &e2sm_mho.BitString{
-						Value: uint64(targetNCI),
+					Value: &asn1.BitString{
+						Value: Uint64ToBitString(uint64(targetNCI), targetNCILen),
 						Len:   uint32(targetNCILen),
 					},
 				},
@@ -111,7 +112,7 @@ func SendHORequest(ueData *UeData, ho handover.A3HandoverDecision, ctrlReqChan c
 	}
 
 	ueIdentity := e2sm_mho.UeIdentity{
-		Value: ueData.UeID,
+		Value: []byte(ueData.UeID),
 	}
 
 	go func() {
