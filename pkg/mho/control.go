@@ -8,7 +8,7 @@ import (
 	e2tapi "github.com/onosproject/onos-api/go/onos/e2t/e2"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/pdubuilder"
-	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
+	e2sm_v2_ies "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-v2-ies"
 	"github.com/onosproject/onos-lib-go/api/asn1/v1/asn1"
 	"github.com/onosproject/rrm-son-lib/pkg/handover"
 	"google.golang.org/protobuf/proto"
@@ -34,7 +34,7 @@ func (c *E2SmMhoControlHandler) CreateMhoControlHeader(cellID []byte, cellIDLen 
 		Value: cellID,
 		Len:   cellIDLen,
 	}
-	cgi, err := pdubuilder.CreateCellGlobalIDNrCGI(plmnID, eci)
+	cgi, err := pdubuilder.CreateCgiNrCGI(plmnID, eci)
 	log.Debugf("eci: %v", eci)
 	log.Debugf("cgi: %v", cgi)
 	if err != nil {
@@ -61,7 +61,7 @@ func (c *E2SmMhoControlHandler) CreateMhoControlHeader(cellID []byte, cellIDLen 
 	return protoBytes, nil
 }
 
-func (c *E2SmMhoControlHandler) CreateMhoControlMessage(servingCgi *e2sm_mho.CellGlobalId, uedID *e2sm_mho.UeIdentity, targetCgi *e2sm_mho.CellGlobalId) ([]byte, error) {
+func (c *E2SmMhoControlHandler) CreateMhoControlMessage(servingCgi *e2sm_v2_ies.Cgi, uedID *e2sm_v2_ies.Ueid, targetCgi *e2sm_v2_ies.Cgi) ([]byte, error) {
 
 	var err error
 
@@ -80,9 +80,9 @@ func (c *E2SmMhoControlHandler) CreateMhoControlMessage(servingCgi *e2sm_mho.Cel
 func SendHORequest(ueData *UeData, ho handover.A3HandoverDecision, ctrlReqChan chan *e2api.ControlMessage) {
 	e2NodeID := ueData.E2NodeID
 	servingCGI := ueData.CGI
-	servingPlmnIDBytes := servingCGI.GetNrCgi().GetPLmnIdentity().GetValue()
-	servingNCI := servingCGI.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
-	servingNCILen := servingCGI.GetNrCgi().GetNRcellIdentity().GetValue().GetLen()
+	servingPlmnIDBytes := servingCGI.GetNRCgi().GetPLmnidentity().GetValue()
+	servingNCI := servingCGI.GetNRCgi().GetNRcellIdentity().GetValue().GetValue()
+	servingNCILen := servingCGI.GetNRCgi().GetNRcellIdentity().GetValue().GetLen()
 	targetPlmnIDBytes := servingPlmnIDBytes
 	targetNCI, err := strconv.Atoi(ho.TargetCell.GetID().String())
 	if err != nil {
@@ -95,13 +95,13 @@ func SendHORequest(ueData *UeData, ho handover.A3HandoverDecision, ctrlReqChan c
 		ControlAckRequest: e2tapi.ControlAckRequest_NO_ACK,
 	}
 
-	targetCGI := &e2sm_mho.CellGlobalId{
-		CellGlobalId: &e2sm_mho.CellGlobalId_NrCgi{
-			NrCgi: &e2sm_mho.Nrcgi{
-				PLmnIdentity: &e2sm_mho.PlmnIdentity{
+	targetCGI := &e2sm_v2_ies.Cgi{
+		Cgi: &e2sm_v2_ies.Cgi_NRCgi{
+			NRCgi: &e2sm_v2_ies.NrCgi{
+				PLmnidentity: &e2sm_v2_ies.PlmnIdentity{
 					Value: targetPlmnIDBytes,
 				},
-				NRcellIdentity: &e2sm_mho.NrcellIdentity{
+				NRcellIdentity: &e2sm_v2_ies.NrcellIdentity{
 					Value: &asn1.BitString{
 						Value: Uint64ToBitString(uint64(targetNCI), targetNCILen),
 						Len:   uint32(targetNCILen),
@@ -111,13 +111,25 @@ func SendHORequest(ueData *UeData, ho handover.A3HandoverDecision, ctrlReqChan c
 		},
 	}
 
-	ueIdentity := e2sm_mho.UeIdentity{
-		Value: []byte(ueData.UeID),
+	//Assuming that UeID string carries decimal number
+	ueIDnum, err := strconv.Atoi(ueData.UeID)
+	if err != nil {
+		log.Errorf("SendHORequest() failed to convert string %v to decimal number - assumption is not satisfied (UEID is a decimal number): %v", ueData.UeID, err)
 	}
+
+	//ToDo - it is necessary to fill in Guami as well.
+	//Should PlmnID come from serving CGI or target CGI??
+	ueIdentity, err := pdubuilder.CreateUeIDGNb(int64(ueIDnum), nil, nil, nil, nil)
+	if err != nil {
+		log.Errorf("SendHORequest() Failed to create UEID: %v", err)
+	}
+	//ueIdentity := e2sm_v2_ies.Ueid{
+	//	Value: []byte(ueData.UeID),
+	//}
 
 	go func() {
 		if e2smMhoControlHandler.ControlHeader, err = e2smMhoControlHandler.CreateMhoControlHeader(servingNCI, servingNCILen, int32(ControlPriority), servingPlmnIDBytes); err == nil {
-			if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, &ueIdentity, targetCGI); err == nil {
+			if e2smMhoControlHandler.ControlMessage, err = e2smMhoControlHandler.CreateMhoControlMessage(servingCGI, ueIdentity, targetCGI); err == nil {
 				if controlRequest, err := e2smMhoControlHandler.CreateMhoControlRequest(); err == nil {
 					ctrlReqChan <- controlRequest
 					log.Infof("tx control, e2NodeID:%v, ueID:%v", e2NodeID, ueData.UeID)
