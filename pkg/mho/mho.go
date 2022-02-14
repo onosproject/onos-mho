@@ -7,7 +7,8 @@ package mho
 import (
 	"context"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
-	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
+	e2sm_v2_ies "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-v2-ies"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
 	"github.com/onosproject/onos-mho/pkg/store"
@@ -27,9 +28,11 @@ const (
 var log = logging.GetLogger("mho")
 
 type UeData struct {
-	UeID          string
+	UeID string // assuming that string carries decimal number
+	//ToDo - stop ignoring it once we'veset up UeID treatment all over the SD-RAN
+	//UeIDtype      string // represents Gnb, Enb, ngEnb and etc..
 	E2NodeID      string
-	CGI           *e2sm_mho.CellGlobalId
+	CGI           *e2sm_v2_ies.Cgi
 	CGIString     string
 	RrcState      string
 	RsrpServing   int32
@@ -126,16 +129,21 @@ func (c *Ctrl) listenHandOver(ctx context.Context) {
 func (c *Ctrl) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	ueID := message.GetUeId().GetValue()
+	ueID, err := GetUeID(message.GetUeId())
+	if err != nil {
+		log.Errorf("handlePeriodicReport() couldn't extract UeID: %v", err)
+	}
 	cgi := getCGIFromIndicationHeader(header)
 	log.Infof("rx periodic ueID:%v cgi:%v", ueID, cgi)
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
 	newUe := false
-	ueData = c.getUe(ctx, ueID)
+	// Not completely correct conversion of UeID - may be a source of problems
+	ueData = c.getUe(ctx, strconv.Itoa(int(ueID)))
 	if ueData == nil {
-		ueData = c.createUe(ctx, ueID)
+		// Not completely correct conversion of UeID - may be a source of problems
+		ueData = c.createUe(ctx, strconv.Itoa(int(ueID)))
 		c.attachUe(ctx, ueData, cgi)
 		newUe = true
 	} else if ueData.CGIString != cgi {
@@ -157,15 +165,20 @@ func (c *Ctrl) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMh
 func (c *Ctrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	ueID := message.GetUeId().GetValue()
+	ueID, err := GetUeID(message.GetUeId())
+	if err != nil {
+		log.Errorf("handleMeasReport() couldn't extract UeID: %v", err)
+	}
 	cgi := getCGIFromIndicationHeader(header)
 	log.Infof("rx a3 ueID:%v cgi:%v", ueID, cgi)
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
-	ueData = c.getUe(ctx, ueID)
+	// Not completely correct conversion of UeID - may be a source of problems
+	ueData = c.getUe(ctx, strconv.Itoa(int(ueID)))
 	if ueData == nil {
-		ueData = c.createUe(ctx, ueID)
+		// Not completely correct conversion of UeID - may be a source of problems
+		ueData = c.createUe(ctx, strconv.Itoa(int(ueID)))
 		c.attachUe(ctx, ueData, cgi)
 	} else if ueData.CGIString != cgi {
 		return
@@ -189,15 +202,20 @@ func (c *Ctrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoInd
 func (c *Ctrl) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat2) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	ueID := message.GetUeId().GetValue()
+	ueID, err := GetUeID(message.GetUeId())
+	if err != nil {
+		log.Errorf("handleRrcState() couldn't extract UeID: %v", err)
+	}
 	cgi := getCGIFromIndicationHeader(header)
 	log.Infof("rx rrc ueID:%v cgi:%v", ueID, cgi)
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
-	ueData = c.getUe(ctx, ueID)
+	// Not completely correct conversion of UeID - may be a source of problems
+	ueData = c.getUe(ctx, strconv.Itoa(int(ueID)))
 	if ueData == nil {
-		ueData = c.createUe(ctx, ueID)
+		// Not completely correct conversion of UeID - may be a source of problems
+		ueData = c.createUe(ctx, strconv.Itoa(int(ueID)))
 		c.attachUe(ctx, ueData, cgi)
 	} else if ueData.CGIString != cgi {
 		return
@@ -374,12 +392,12 @@ func plmnIDNciToCGI(plmnID uint64, nci uint64) string {
 //	return plmnIDBytesToInt(plmnIDBytes)
 //}
 
-func getNciFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) uint64 {
-	return cellGlobalID.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
+func getNciFromCellGlobalID(cellGlobalID *e2sm_v2_ies.Cgi) uint64 {
+	return BitStringToUint64(cellGlobalID.GetNRCgi().GetNRcellIdentity().GetValue().GetValue(), int(cellGlobalID.GetNRCgi().GetNRcellIdentity().GetValue().GetLen()))
 }
 
-func getPlmnIDBytesFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) []byte {
-	return cellGlobalID.GetNrCgi().GetPLmnIdentity().GetValue()
+func getPlmnIDBytesFromCellGlobalID(cellGlobalID *e2sm_v2_ies.Cgi) []byte {
+	return cellGlobalID.GetNRCgi().GetPLmnidentity().GetValue()
 }
 
 func getCGIFromIndicationHeader(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1) string {
@@ -398,7 +416,7 @@ func getCGIFromMeasReportItem(measReport *e2sm_mho.E2SmMhoMeasurementReportItem)
 
 func getCgiFromHO(ueData *UeData, ho handover.A3HandoverDecision) string {
 	servingCGI := ueData.CGI
-	servingPlmnIDBytes := servingCGI.GetNrCgi().GetPLmnIdentity().GetValue()
+	servingPlmnIDBytes := servingCGI.GetNRCgi().GetPLmnidentity().GetValue()
 	servingPlmnID := plmnIDBytesToInt(servingPlmnIDBytes)
 	targetPlmnID := servingPlmnID
 	targetNCI, err := strconv.Atoi(ho.TargetCell.GetID().String())
