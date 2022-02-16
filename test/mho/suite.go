@@ -51,5 +51,5 @@ func (s *TestSuite) SetupTestSuite(c *input.Context) error {
 // TearDownTestSuite uninstalls helm chart released
 func (s *TestSuite) TearDownTestSuite() error {
 	testutils.StopTestProxy()
-	return s.sdran.Uninstall()
+	return nil
 }

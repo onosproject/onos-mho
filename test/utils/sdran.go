@@ -51,6 +51,7 @@ func CreateSdranRelease(c *input.Context) (*helm.HelmRelease, error) {
 		Set("import.ran-simulator.enabled", true).
 		Set("import.onos-mho.enabled", false).
 		Set("onos-mho.image.tag", "latest").
+		Set("onos-e2t.image.tag", "latest").
 		Set("ran-simulator.image.tag", "latest").
 		Set("ran-simulator.pci.modelName", "two-cell-two-node-model").
 		Set("global.image.registry", registry)
