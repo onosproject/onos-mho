@@ -193,11 +193,11 @@ func (c *Ctrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoInd
 	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
 
 	// update 5QI
-	log.Warnf("Going to update 5QI (%v) for UE %v", ueData.FiveQI, ueID)
+	log.Debugf("Going to update 5QI (%v) for UE %v", ueData.FiveQI, ueID)
 	for _, item := range message.GetMeasReport() {
 		if item.GetFiveQi() != nil && item.GetFiveQi().GetValue() > -1 {
 			ueData.FiveQI = item.GetFiveQi().GetValue()
-			log.Warnf("Obtained 5QI value %v for UE %v", ueData.FiveQI, ueID)
+			log.Debugf("Obtained 5QI value %v for UE %v", ueData.FiveQI, ueID)
 		}
 	}
 
