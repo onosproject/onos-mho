@@ -43,7 +43,7 @@ func (c *E2SmMhoControlHandler) CreateMhoControlHeader(cellID []byte, cellIDLen 
 
 	newE2SmMhoPdu, err := pdubuilder.CreateE2SmMhoControlHeader(priority)
 
-	log.Debugf("newE2SmMhoPdu: %v", newE2SmMhoPdu)
+	log.Debugf("newE2SmMhoPdu (ControlHeader): %v", newE2SmMhoPdu)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -67,6 +67,7 @@ func (c *E2SmMhoControlHandler) CreateMhoControlMessage(servingCgi *e2sm_v2_ies.
 
 	if newE2SmMhoPdu, err := pdubuilder.CreateE2SmMhoControlMessage(servingCgi, uedID, targetCgi); err == nil {
 		if err = newE2SmMhoPdu.Validate(); err == nil {
+			log.Debugf("newE2SmMhoPdu (ControlMessage): %v", newE2SmMhoPdu)
 			if protoBytes, err := proto.Marshal(newE2SmMhoPdu); err == nil {
 				return protoBytes, nil
 			}
@@ -117,9 +118,8 @@ func SendHORequest(ueData *UeData, ho handover.A3HandoverDecision, ctrlReqChan c
 		log.Errorf("SendHORequest() failed to convert string %v to decimal number - assumption is not satisfied (UEID is a decimal number): %v", ueData.UeID, err)
 	}
 
-	//ToDo - it is necessary to fill in Guami as well.
-	//Should PlmnID come from serving CGI or target CGI??
-	ueIdentity, err := pdubuilder.CreateUeIDGNb(int64(ueIDnum), nil, nil, nil, nil)
+	//ToDo - move out hardcoding of Guami (currently it is aliggned with the one in RANSim)
+	ueIdentity, err := pdubuilder.CreateUeIDGNb(int64(ueIDnum), []byte{0xAA, 0xBB, 0xCC}, []byte{0xDD}, []byte{0xCC, 0xC0}, []byte{0xFC})
 	if err != nil {
 		log.Errorf("SendHORequest() Failed to create UEID: %v", err)
 	}

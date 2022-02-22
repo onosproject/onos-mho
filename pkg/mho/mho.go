@@ -35,6 +35,7 @@ type UeData struct {
 	CGI           *e2sm_v2_ies.Cgi
 	CGIString     string
 	RrcState      string
+	FiveQI        int32
 	RsrpServing   int32
 	RsrpNeighbors map[string]int32
 }
@@ -190,6 +191,15 @@ func (c *Ctrl) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoInd
 
 	// update rsrp
 	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
+
+	// update 5QI
+	log.Warnf("Going to update 5QI (%v) for UE %v", ueData.FiveQI, ueID)
+	for _, item := range message.GetMeasReport() {
+		if item.GetFiveQi() != nil && item.GetFiveQi().GetValue() > -1 {
+			ueData.FiveQI = item.GetFiveQi().GetValue()
+			log.Warnf("Obtained 5QI value %v for UE %v", ueData.FiveQI, ueID)
+		}
+	}
 
 	// update store
 	c.setUe(ctx, ueData)
