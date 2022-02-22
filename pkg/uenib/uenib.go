@@ -110,6 +110,12 @@ func (c *client) createUENIBUpdateReq(entry *store.Entry) *uenib.UpdateUERequest
 		Value: []byte(strconv.Itoa(int(ueData.RsrpServing))),
 	}
 
+	uenibObj.Aspects["5QI"] = &types.Any{
+		TypeUrl: "5QI",
+		// TODO
+		Value: []byte(strconv.Itoa(int(ueData.FiveQI))),
+	}
+
 	var str string
 	for cgi, rsrp := range ueData.RsrpNeighbors {
 		str = str + fmt.Sprintf("%s:%s ", cgi, strconv.Itoa(int(rsrp)))
