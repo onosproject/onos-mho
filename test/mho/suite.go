@@ -16,10 +16,12 @@ import (
 type TestSuite struct {
 	sdran *helm.HelmRelease
 	test.Suite
+	c *input.Context
 }
 
 // SetupTestSuite prepares test suite setup
 func (s *TestSuite) SetupTestSuite(c *input.Context) error {
+	s.c = c
 	// write files
 	err := utils.WriteFile("/tmp/tls.cacrt", utils.TLSCacrt)
 	if err != nil {

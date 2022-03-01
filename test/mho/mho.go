@@ -15,6 +15,8 @@ import (
 
 // TestMhoSm is the function for Helmit-based integration test
 func (s *TestSuite) TestMhoSm(t *testing.T) {
+	sim := utils.CreateRanSimulatorWithNameOrDie(t, s.c, "test-mho-sm")
+	assert.NotNil(t, sim)
 	cfg := manager.Config{
 		CAPath:      "/tmp/tls.cacrt",
 		KeyPath:     "/tmp/tls.key",
@@ -44,5 +46,6 @@ func (s *TestSuite) TestMhoSm(t *testing.T) {
 	ok = utils.VerifyHO(ctx, t, mgr, ueData.UeID)
 	assert.True(t, ok)
 
+	assert.NoError(t, sim.Uninstall())
 	t.Log("MHO suite test passed")
 }
