@@ -48,12 +48,10 @@ func CreateSdranRelease(c *input.Context) (*helm.HelmRelease, error) {
 		SetPassword(password).
 		Set("import.onos-config.enabled", false).
 		Set("import.onos-topo.enabled", true).
-		Set("import.ran-simulator.enabled", true).
 		Set("import.onos-mho.enabled", false).
 		Set("onos-mho.image.tag", "latest").
 		Set("onos-e2t.image.tag", "latest").
 		Set("ran-simulator.image.tag", "latest").
-		Set("ran-simulator.pci.modelName", "two-cell-two-node-model").
 		Set("global.image.registry", registry)
 
 	return sdran, nil
@@ -207,6 +205,7 @@ func CreateRanSimulatorWithName(t *testing.T, c *input.Context, name string) *he
 		SetPassword(password).
 		Set("image.tag", "latest").
 		Set("fullnameOverride", "").
+		Set("pci.modelName", "two-cell-two-node-model").
 		Set("global.image.registry", registry)
 	err = simulator.Install(true)
 	assert.NoError(t, err, "could not install device simulator %v", err)
