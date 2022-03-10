@@ -6,6 +6,7 @@ package northbound
 
 import (
 	"context"
+
 	mhoapi "github.com/onosproject/onos-api/go/onos/mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-lib-go/pkg/logging/service"
@@ -14,7 +15,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-var log = logging.GetLogger("northbound")
+var log = logging.GetLogger()
 
 // NewService ...
 func NewService(ueStore store.Store, cellStore store.Store) service.Service {

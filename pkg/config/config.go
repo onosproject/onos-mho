@@ -15,7 +15,7 @@ import (
 	configutils "github.com/onosproject/onos-ric-sdk-go/pkg/config/utils"
 )
 
-var log = logging.GetLogger("config")
+var log = logging.GetLogger()
 
 const (
 	ReportingPeriodConfigPath      = "reportingPeriod"
