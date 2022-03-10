@@ -15,7 +15,7 @@ import (
 	"github.com/onosproject/onos-lib-go/pkg/errors"
 )
 
-var log = logging.GetLogger("store", "records")
+var log = logging.GetLogger()
 
 // Store mho store interface
 type Store interface {

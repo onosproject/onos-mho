@@ -6,6 +6,7 @@ package monitoring
 
 import (
 	"context"
+
 	"github.com/onosproject/onos-mho/pkg/mho"
 	"github.com/onosproject/onos-mho/pkg/rnib"
 
@@ -24,7 +25,7 @@ import (
 	e2ind "github.com/onosproject/onos-ric-sdk-go/pkg/e2/indication"
 )
 
-var log = logging.GetLogger("monitoring")
+var log = logging.GetLogger()
 
 // NewMonitor creates a new indication monitor
 func NewMonitor(opts ...Option) *Monitor {

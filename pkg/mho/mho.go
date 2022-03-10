@@ -6,6 +6,10 @@ package mho
 
 import (
 	"context"
+	"reflect"
+	"strconv"
+	"sync"
+
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
 	e2sm_v2_ies "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-v2-ies"
@@ -16,16 +20,13 @@ import (
 	"github.com/onosproject/rrm-son-lib/pkg/handover"
 	rrmid "github.com/onosproject/rrm-son-lib/pkg/model/id"
 	"google.golang.org/protobuf/proto"
-	"reflect"
-	"strconv"
-	"sync"
 )
 
 const (
 	ControlPriority = 10
 )
 
-var log = logging.GetLogger("mho")
+var log = logging.GetLogger()
 
 type UeData struct {
 	UeID string // assuming that string carries decimal number

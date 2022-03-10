@@ -7,13 +7,14 @@ package uenib
 import (
 	"context"
 	"fmt"
+	"strconv"
+
 	"github.com/gogo/protobuf/types"
 	"github.com/onosproject/onos-api/go/onos/uenib"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-lib-go/pkg/southbound"
 	"github.com/onosproject/onos-mho/pkg/mho"
 	"github.com/onosproject/onos-mho/pkg/store"
-	"strconv"
 )
 
 const (
@@ -21,7 +22,7 @@ const (
 	UENIBAddress = "onos-uenib:5150"
 )
 
-var log = logging.GetLogger("uenib")
+var log = logging.GetLogger()
 
 // NewUENIBClient returns new UENIBClient object
 func NewUENIBClient(ctx context.Context, certPath string, keyPath string, store store.Store) Client {

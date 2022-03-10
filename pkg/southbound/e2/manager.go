@@ -7,9 +7,10 @@ package e2
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/onosproject/onos-mho/pkg/mho"
 	"google.golang.org/protobuf/proto"
-	"strings"
 
 	"github.com/onosproject/onos-mho/pkg/monitoring"
 
@@ -30,7 +31,7 @@ import (
 	e2client "github.com/onosproject/onos-ric-sdk-go/pkg/e2/v1beta1"
 )
 
-var log = logging.GetLogger("e2", "subscription", "manager")
+var log = logging.GetLogger()
 
 const (
 	oid = "1.3.6.1.4.1.53148.1.2.2.101"
