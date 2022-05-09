@@ -41,12 +41,10 @@ protos:
 
 helmit-mho: integration-test-namespace # @HELP run MHO tests locally
 	helmit test -n test ./cmd/onos-mho-test --timeout 30m --no-teardown \
-			--secret sd-ran-username=${repo_user} --secret sd-ran-password=${repo_password} \
 			--suite mho
 
 helmit-ha: integration-test-namespace # @HELP run MHO HA tests locally
 	helmit test -n test ./cmd/onos-mho-test --timeout 30m --no-teardown \
-			--secret sd-ran-username=${repo_user} --secret sd-ran-password=${repo_password} \
 			--suite ha
 
 integration-tests: helmit-mho helmit-ha # @HELP run all MHO integration tests locally
