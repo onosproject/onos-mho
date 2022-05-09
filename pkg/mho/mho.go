@@ -16,7 +16,6 @@ import (
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
 	"github.com/onosproject/onos-mho/pkg/store"
-	"github.com/onosproject/onos-ric-sdk-go/pkg/e2/indication"
 	"github.com/onosproject/rrm-son-lib/pkg/handover"
 	rrmid "github.com/onosproject/rrm-son-lib/pkg/model/id"
 	"google.golang.org/protobuf/proto"
@@ -51,7 +50,7 @@ type CellData struct {
 type E2NodeIndication struct {
 	NodeID      string
 	TriggerType e2sm_mho.MhoTriggerType
-	IndMsg      indication.Indication
+	IndMsg      e2api.Indication
 }
 
 // Ctrl is the controller for MHO
@@ -90,8 +89,8 @@ func (c *Ctrl) listenIndChan(ctx context.Context) {
 	var err error
 	for indMsg := range c.IndChan {
 
-		indHeaderByte := indMsg.IndMsg.Payload.Header
-		indMessageByte := indMsg.IndMsg.Payload.Message
+		indHeaderByte := indMsg.IndMsg.Header
+		indMessageByte := indMsg.IndMsg.Payload
 		e2NodeID := indMsg.NodeID
 
 		indHeader := e2sm_mho.E2SmMhoIndicationHeader{}

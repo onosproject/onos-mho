@@ -9,3 +9,4 @@ build/build-tools
 *report*.xml
 *coverage*.xml
 *-output.out
+.idea/
