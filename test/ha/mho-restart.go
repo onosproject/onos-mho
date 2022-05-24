@@ -90,6 +90,7 @@ func (s *TestSuite) TestMhoRestart(t *testing.T) {
 		// Crash onos-mho
 		e2tPod := FindPodWithPrefix(t, "onos-mho")
 		CrashPodOrFail(t, e2tPod)
+		time.Sleep(5 * time.Second)
 
 		//TODO
 		resp = GetUesOrFail(t)
