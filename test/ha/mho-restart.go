@@ -12,6 +12,7 @@ import (
 	"github.com/onosproject/onos-api/go/onos/mho"
 	"github.com/onosproject/onos-mho/test/utils"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/types"
 	"strings"
 	"testing"
 	"time"
@@ -77,6 +78,17 @@ func GetUesOrFail(t *testing.T) *mho.UeList {
 	return nil
 }
 
+func findNewMHOPod(t *testing.T, oldUID types.UID) *v1.Pod {
+	for i := 1; i <= 10; i++ {
+		mhoPod := FindPodWithPrefix(t, "onos-mho")
+		if oldUID != mhoPod.UID {
+			return mhoPod
+		}
+		time.Sleep(time.Second)
+	}
+	return nil
+}
+
 // TestMhoRestart tests that onos-mho recovers from crashes
 func (s *TestSuite) TestMhoRestart(t *testing.T) {
 	sim := utils.CreateRanSimulatorWithNameOrDie(t, s.c, "test-mho-restart")
@@ -85,12 +97,13 @@ func (s *TestSuite) TestMhoRestart(t *testing.T) {
 	// First make sure that MHO came up properly
 	resp := GetUesOrFail(t)
 	assert.NotNil(t, resp)
+	prevPodUID := types.UID("")
 
 	for i := 1; i <= 5; i++ {
 		// Crash onos-mho
-		e2tPod := FindPodWithPrefix(t, "onos-mho")
-		CrashPodOrFail(t, e2tPod)
-		time.Sleep(5 * time.Second)
+		mhoPod := findNewMHOPod(t, prevPodUID)
+		CrashPodOrFail(t, mhoPod)
+		prevPodUID = mhoPod.UID
 
 		//TODO
 		resp = GetUesOrFail(t)
