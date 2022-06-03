@@ -235,8 +235,7 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 			go m.watchMHOChanges(ctx, e2NodeID)
 		} else if topoEvent.Type == topoapi.EventType_REMOVED {
 			// TODO - Handle E2 node disconnect
-			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)
-			e2NodeID := relation.Relation.TgtEntityID
+			e2NodeID := topoEvent.Object.ID
 			cellIDs, err := m.rnibClient.GetCells(ctx, e2NodeID)
 			if err != nil {
 				return err

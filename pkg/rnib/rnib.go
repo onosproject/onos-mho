@@ -101,7 +101,7 @@ func (c *Client) GetCells(ctx context.Context, nodeID topoapi.ID) ([]*topoapi.E2
 }
 
 func getE2NodeFilter() *topoapi.Filters {
-	controlRelationFilter := &topoapi.Filters{
+	e2NodeFilter := &topoapi.Filters{
 		KindFilter: &topoapi.Filter{
 			Filter: &topoapi.Filter_Equal_{
 				Equal_: &topoapi.EqualFilter{
@@ -110,7 +110,7 @@ func getE2NodeFilter() *topoapi.Filters {
 			},
 		},
 	}
-	return controlRelationFilter
+	return e2NodeFilter
 }
 
 // WatchE2Connections watch e2 node connection changes
