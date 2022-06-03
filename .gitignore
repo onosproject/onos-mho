@@ -10,3 +10,5 @@ build/build-tools
 *coverage*.xml
 *-output.out
 .idea/
+
+vendor

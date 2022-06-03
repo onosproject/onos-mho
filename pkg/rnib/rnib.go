@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2022-present Intel Corporation
 // SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -42,15 +43,14 @@ type Client struct {
 
 // E2NodeIDs lists all of connected E2 nodes
 func (c *Client) E2NodeIDs(ctx context.Context) ([]topoapi.ID, error) {
-	objects, err := c.client.List(ctx, toposdk.WithListFilters(getControlRelationFilter()))
+	objects, err := c.client.List(ctx, toposdk.WithListFilters(getE2NodeFilter()))
 	if err != nil {
 		return nil, err
 	}
 
 	e2NodeIDs := make([]topoapi.ID, len(objects))
 	for _, object := range objects {
-		relation := object.Obj.(*topoapi.Object_Relation)
-		e2NodeID := relation.Relation.TgtEntityID
+		e2NodeID := object.ID
 		e2NodeIDs = append(e2NodeIDs, e2NodeID)
 	}
 
@@ -100,12 +100,12 @@ func (c *Client) GetCells(ctx context.Context, nodeID topoapi.ID) ([]*topoapi.E2
 	return cells, nil
 }
 
-func getControlRelationFilter() *topoapi.Filters {
+func getE2NodeFilter() *topoapi.Filters {
 	controlRelationFilter := &topoapi.Filters{
 		KindFilter: &topoapi.Filter{
 			Filter: &topoapi.Filter_Equal_{
 				Equal_: &topoapi.EqualFilter{
-					Value: topoapi.CONTROLS,
+					Value: topoapi.E2NODE,
 				},
 			},
 		},
@@ -115,7 +115,7 @@ func getControlRelationFilter() *topoapi.Filters {
 
 // WatchE2Connections watch e2 node connection changes
 func (c *Client) WatchE2Connections(ctx context.Context, ch chan topoapi.Event) error {
-	err := c.client.Watch(ctx, ch, toposdk.WithWatchFilters(getControlRelationFilter()))
+	err := c.client.Watch(ctx, ch, toposdk.WithWatchFilters(getE2NodeFilter()))
 	if err != nil {
 		return err
 	}
