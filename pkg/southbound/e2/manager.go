@@ -215,7 +215,12 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 	// creates a new subscription whenever there is a new E2 node connected and supports MHO service model
 	for topoEvent := range ch {
 		if topoEvent.Type == topoapi.EventType_ADDED || topoEvent.Type == topoapi.EventType_NONE {
-			e2NodeID := topoEvent.Object.ID
+			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)
+			e2NodeID := relation.Relation.TgtEntityID
+			if !m.rnibClient.HasMHORANFunction(ctx, e2NodeID, oid) {
+				log.Debugf("Received topo event does not have MHO RAN function - %v", topoEvent)
+				continue
+			}
 			m.CtrlReqChs[string(e2NodeID)] = make(chan *e2api.ControlMessage)
 			triggers := make(map[e2sm_mho.MhoTriggerType]bool)
 			triggers[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC] = m.appConfig.GetPeriodic()
@@ -235,7 +240,12 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 			go m.watchMHOChanges(ctx, e2NodeID)
 		} else if topoEvent.Type == topoapi.EventType_REMOVED {
 			// TODO - Handle E2 node disconnect
-			e2NodeID := topoEvent.Object.ID
+			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)
+			e2NodeID := relation.Relation.TgtEntityID
+			if !m.rnibClient.HasMHORANFunction(ctx, e2NodeID, oid) {
+				log.Debugf("Received topo event does not have MHO RAN function - %v", topoEvent)
+				continue
+			}
 			cellIDs, err := m.rnibClient.GetCells(ctx, e2NodeID)
 			if err != nil {
 				return err
