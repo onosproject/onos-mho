@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2022-present Intel Corporation
 // SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -216,6 +217,10 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 		if topoEvent.Type == topoapi.EventType_ADDED || topoEvent.Type == topoapi.EventType_NONE {
 			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)
 			e2NodeID := relation.Relation.TgtEntityID
+			if !m.rnibClient.HasMHORANFunction(ctx, e2NodeID, oid) {
+				log.Debugf("Received topo event does not have MHO RAN function - %v", topoEvent)
+				continue
+			}
 			m.CtrlReqChs[string(e2NodeID)] = make(chan *e2api.ControlMessage)
 			triggers := make(map[e2sm_mho.MhoTriggerType]bool)
 			triggers[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC] = m.appConfig.GetPeriodic()
@@ -237,6 +242,10 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 			// TODO - Handle E2 node disconnect
 			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)
 			e2NodeID := relation.Relation.TgtEntityID
+			if !m.rnibClient.HasMHORANFunction(ctx, e2NodeID, oid) {
+				log.Debugf("Received topo event does not have MHO RAN function - %v", topoEvent)
+				continue
+			}
 			cellIDs, err := m.rnibClient.GetCells(ctx, e2NodeID)
 			if err != nil {
 				return err
