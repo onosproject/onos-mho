@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2022-present Intel Corporation
 // SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -19,7 +20,7 @@ var log = logging.GetLogger()
 
 // Store mho store interface
 type Store interface {
-	Put(ctx context.Context, key string, value interface{}) (*Entry, error)
+	Put(ctx context.Context, key string, value interface{}, state MHOState) (*Entry, error)
 
 	// Get gets a store entry based on a given key
 	Get(ctx context.Context, key string) (*Entry, error)
@@ -32,6 +33,11 @@ type Store interface {
 
 	// Watch store changes
 	Watch(ctx context.Context, ch chan<- Event) error
+
+	// HasEntry checks if store has entry
+	HasEntry(ctx context.Context, key string) bool
+
+	NumWatchers() int
 }
 
 type store struct {
@@ -70,21 +76,32 @@ func (s *store) Delete(ctx context.Context, key string) error {
 
 }
 
-func (s *store) Put(ctx context.Context, key string, value interface{}) (*Entry, error) {
+func (s *store) Put(ctx context.Context, key string, value interface{}, state MHOState) (*Entry, error) {
+	log.Debugf("Put store entry: key: %v, value: %v", key, value)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	entry := &Entry{
 		Key:   key,
 		Value: value,
 	}
+	if _, ok := s.records[key]; !ok {
+		s.records[key] = entry
+		s.watchers.Send(Event{
+			Key:           key,
+			Value:         entry,
+			Type:          Created,
+			EventMHOState: state,
+		})
+		return entry, nil
+	}
 	s.records[key] = entry
 	s.watchers.Send(Event{
-		Key:   key,
-		Value: entry,
-		Type:  Created,
+		Key:           key,
+		Value:         entry,
+		Type:          Updated,
+		EventMHOState: state,
 	})
 	return entry, nil
-
 }
 
 func (s *store) Get(ctx context.Context, key string) (*Entry, error) {
@@ -94,6 +111,15 @@ func (s *store) Get(ctx context.Context, key string) (*Entry, error) {
 		return v, nil
 	}
 	return nil, errors.New(errors.NotFound, "the entry does not exist")
+}
+
+func (s *store) HasEntry(ctx context.Context, key string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.records[key]; ok {
+		return true
+	}
+	return false
 }
 
 func (s *store) Watch(ctx context.Context, ch chan<- Event) error {
@@ -113,6 +139,10 @@ func (s *store) Watch(ctx context.Context, ch chan<- Event) error {
 		close(ch)
 	}()
 	return nil
+}
+
+func (s *store) NumWatchers() int {
+	return len(s.watchers.watchers)
 }
 
 var _ Store = &store{}

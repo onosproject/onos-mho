@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2022-present Intel Corporation
 // SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -21,8 +22,8 @@ func main() {
 	configPath := flag.String("configPath", "/etc/onos/config/config.json", "path to config.json file")
 	e2tEndpoint := flag.String("e2tEndpoint", "onos-e2t:5150", "E2T service endpoint")
 	grpcPort := flag.Int("grpcPort", 5150, "grpc Port number")
-	smName := flag.String("smName", "oran-e2sm-mho", "Service model name in RAN function description")
-	smVersion := flag.String("smVersion", "v2", "Service model version in RAN function description")
+	smName := flag.String("smName", "oran-e2sm-rc", "Service model name in RAN function description")
+	smVersion := flag.String("smVersion", "v1", "Service model version in RAN function description")
 
 	ready := make(chan bool)
 

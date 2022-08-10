@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2022-present Intel Corporation
 // SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -5,10 +6,8 @@
 package e2
 
 import (
-	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	"github.com/onosproject/onos-mho/pkg/broker"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
-	"github.com/onosproject/onos-mho/pkg/mho"
 	"github.com/onosproject/onos-mho/pkg/store"
 )
 
@@ -31,13 +30,7 @@ type AppOptions struct {
 
 	Broker broker.Broker
 
-	IndCh chan *mho.E2NodeIndication
-
-	CtrlReqChs map[string]chan *e2api.ControlMessage
-
-	UeStore store.Store
-
-	CellStore store.Store
+	MetricStore store.Store
 }
 
 // ServiceOptions are the options for a E2T service
@@ -151,30 +144,9 @@ func WithBroker(broker broker.Broker) Option {
 	})
 }
 
-// WithIndChan ...
-func WithIndChan(indCh chan *mho.E2NodeIndication) Option {
+// WithMetricStore sets metric store
+func WithMetricStore(metricStore store.Store) Option {
 	return newOption(func(options *Options) {
-		options.App.IndCh = indCh
-	})
-}
-
-// WithCtrlReqChs ...
-func WithCtrlReqChs(ctrlReqChs map[string]chan *e2api.ControlMessage) Option {
-	return newOption(func(options *Options) {
-		options.App.CtrlReqChs = ctrlReqChs
-	})
-}
-
-// WithUeStore sets measurement store
-func WithUeStore(ueStore store.Store) Option {
-	return newOption(func(options *Options) {
-		options.App.UeStore = ueStore
-	})
-}
-
-// WithCellStore sets measurement store
-func WithCellStore(cellStore store.Store) Option {
-	return newOption(func(options *Options) {
-		options.App.CellStore = cellStore
+		options.App.MetricStore = metricStore
 	})
 }
