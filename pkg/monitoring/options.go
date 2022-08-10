@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2022-present Intel Corporation
 // SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -8,10 +9,9 @@ import (
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
 	"github.com/onosproject/onos-mho/pkg/broker"
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
-	"github.com/onosproject/onos-mho/pkg/mho"
 	"github.com/onosproject/onos-mho/pkg/rnib"
+	"github.com/onosproject/onos-mho/pkg/store"
 
-	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
 	e2client "github.com/onosproject/onos-ric-sdk-go/pkg/e2/v1beta1"
 )
 
@@ -28,9 +28,7 @@ type AppOptions struct {
 
 	RNIBClient rnib.Client
 
-	IndCh chan *mho.E2NodeIndication
-
-	TriggerType e2sm_mho.MhoTriggerType
+	MetricStore store.Store
 }
 
 // MonitorOptions monitoring options
@@ -94,14 +92,9 @@ func WithRNIBClient(rnibClient rnib.Client) Option {
 	})
 }
 
-func WithIndChan(indCh chan *mho.E2NodeIndication) Option {
+// WithMetricStore sets metric store
+func WithMetricStore(metricStore store.Store) Option {
 	return newOption(func(options *Options) {
-		options.App.IndCh = indCh
-	})
-}
-
-func WithTriggerType(triggerType e2sm_mho.MhoTriggerType) Option {
-	return newOption(func(options *Options) {
-		options.App.TriggerType = triggerType
+		options.App.MetricStore = metricStore
 	})
 }

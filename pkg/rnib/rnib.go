@@ -18,7 +18,7 @@ type TopoClient interface {
 	GetCells(ctx context.Context, nodeID topoapi.ID) ([]*topoapi.E2Cell, error)
 	GetE2NodeAspects(ctx context.Context, nodeID topoapi.ID) (*topoapi.E2Node, error)
 	E2NodeIDs(ctx context.Context, oid string) ([]topoapi.ID, error)
-	HasMHORANFunction(ctx context.Context, nodeID topoapi.ID, oid string) bool
+	HasRcRANFunction(ctx context.Context, nodeID topoapi.ID, oid string) bool
 }
 
 // NewClient creates a new topo SDK client
@@ -40,7 +40,7 @@ type Client struct {
 	client toposdk.Client
 }
 
-func (c *Client) HasMHORANFunction(ctx context.Context, nodeID topoapi.ID, oid string) bool {
+func (c *Client) HasRcRANFunction(ctx context.Context, nodeID topoapi.ID, oid string) bool {
 	e2Node, err := c.GetE2NodeAspects(ctx, nodeID)
 	if err != nil {
 		return false
@@ -65,7 +65,7 @@ func (c *Client) E2NodeIDs(ctx context.Context, oid string) ([]topoapi.ID, error
 	for _, object := range objects {
 		relation := object.Obj.(*topoapi.Object_Relation)
 		e2NodeID := relation.Relation.TgtEntityID
-		if c.HasMHORANFunction(ctx, e2NodeID, oid) {
+		if c.HasRcRANFunction(ctx, e2NodeID, oid) {
 			e2NodeIDs = append(e2NodeIDs, e2NodeID)
 		}
 	}

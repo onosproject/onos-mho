@@ -8,10 +8,10 @@ package e2
 import (
 	"context"
 	"fmt"
+	"github.com/onosproject/onos-mho/pkg/store"
+	"github.com/onosproject/onos-mho/pkg/utils/control"
+	"github.com/onosproject/onos-mho/pkg/utils/subscription"
 	"strings"
-
-	"github.com/onosproject/onos-mho/pkg/mho"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/onosproject/onos-mho/pkg/monitoring"
 
@@ -25,8 +25,6 @@ import (
 	appConfig "github.com/onosproject/onos-mho/pkg/config"
 
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
-	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/pdubuilder"
-	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-mho/pkg/rnib"
 	e2client "github.com/onosproject/onos-ric-sdk-go/pkg/e2/v1beta1"
@@ -35,7 +33,7 @@ import (
 var log = logging.GetLogger()
 
 const (
-	oid = "1.3.6.1.4.1.53148.1.2.2.101"
+	oid = "1.3.6.1.4.1.53148.1.1.2.3"
 )
 
 // Node e2 manager interface
@@ -51,8 +49,7 @@ type Manager struct {
 	serviceModel ServiceModelOptions
 	appConfig    appConfig.Config
 	streams      broker.Broker
-	indChan      chan *mho.E2NodeIndication
-	CtrlReqChs   map[string]chan *e2api.ControlMessage
+	metricStore  store.Store
 }
 
 // NewManager creates a new subscription manager
@@ -84,10 +81,9 @@ func NewManager(opts ...Option) (Manager, error) {
 			Name:    options.ServiceModel.Name,
 			Version: options.ServiceModel.Version,
 		},
-		appConfig:  options.App.Config,
-		streams:    options.App.Broker,
-		indChan:    options.App.IndCh,
-		CtrlReqChs: options.App.CtrlReqChs,
+		appConfig:   options.App.Config,
+		streams:     options.App.Broker,
+		metricStore: options.App.MetricStore,
 	}, nil
 
 }
@@ -123,18 +119,18 @@ func (m *Manager) sendIndicationOnStream(streamID broker.StreamID, ch chan e2api
 	}
 }
 
-func (m *Manager) getRanFunction(serviceModelsInfo map[string]*topoapi.ServiceModelInfo) (*topoapi.MHORanFunction, error) {
+func (m *Manager) getRanFunction(serviceModelsInfo map[string]*topoapi.ServiceModelInfo) (*topoapi.RCRanFunction, error) {
 	for _, sm := range serviceModelsInfo {
 		smName := strings.ToLower(sm.Name)
 		if smName == string(m.serviceModel.Name) && sm.OID == oid {
-			mhoRanFunction := &topoapi.MHORanFunction{}
+			rcRanFunction := &topoapi.RCRanFunction{}
 			for _, ranFunction := range sm.RanFunctions {
 				if ranFunction.TypeUrl == ranFunction.GetTypeUrl() {
-					err := prototypes.UnmarshalAny(ranFunction, mhoRanFunction)
+					err := prototypes.UnmarshalAny(ranFunction, rcRanFunction)
 					if err != nil {
 						return nil, err
 					}
-					return mhoRanFunction, nil
+					return rcRanFunction, nil
 				}
 			}
 		}
@@ -143,12 +139,12 @@ func (m *Manager) getRanFunction(serviceModelsInfo map[string]*topoapi.ServiceMo
 
 }
 
-func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, triggerType e2sm_mho.MhoTriggerType) error {
+func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID) error {
+	log.Infof("Creating subscription for E2 node with ID: ", e2nodeID)
 
-	eventTriggerData, err := m.createEventTrigger(triggerType)
+	eventTriggerData, err := subscription.CreateEventTriggerDefinition()
 	if err != nil {
 		log.Error(err)
-		//log.Warn(err)
 		return err
 	}
 
@@ -164,11 +160,14 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, t
 		return err
 	}
 
-	actions := m.createSubscriptionActions()
+	actions, err := subscription.CreateSubscriptionAction()
+	if err != nil {
+		log.Warn(err)
+	}
 
 	ch := make(chan e2api.Indication)
 	node := m.e2client.Node(e2client.NodeID(e2nodeID))
-	subName := fmt.Sprintf("onos-mho-subscription-%s", triggerType)
+	subName := fmt.Sprint("onos-mho-subscription")
 	subSpec := e2api.SubscriptionSpec{
 		Actions: actions,
 		EventTrigger: e2api.EventTrigger{
@@ -180,6 +179,7 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, t
 		log.Warn(err)
 		return err
 	}
+	log.Debugf("Channel ID: %s", channelID)
 	streamReader, err := m.streams.OpenReader(ctx, node, subName, channelID, subSpec)
 	if err != nil {
 		return err
@@ -191,8 +191,7 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, t
 		monitoring.WithStreamReader(streamReader),
 		monitoring.WithNodeID(e2nodeID),
 		monitoring.WithRNIBClient(m.rnibClient),
-		monitoring.WithIndChan(m.indChan),
-		monitoring.WithTriggerType(triggerType))
+		monitoring.WithMetricStore(m.metricStore))
 
 	err = monitor.Start(ctx)
 	if err != nil {
@@ -201,6 +200,11 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, t
 
 	return nil
 
+}
+
+func (m *Manager) newSubscription(ctx context.Context, e2NodeID topoapi.ID) error {
+	err := m.createSubscription(ctx, e2NodeID)
+	return err
 }
 
 func (m *Manager) watchE2Connections(ctx context.Context) error {
@@ -212,38 +216,32 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 		return err
 	}
 
-	// creates a new subscription whenever there is a new E2 node connected and supports MHO service model
 	for topoEvent := range ch {
 		if topoEvent.Type == topoapi.EventType_ADDED || topoEvent.Type == topoapi.EventType_NONE {
+			log.Infof("New E2 connection detected")
 			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)
 			e2NodeID := relation.Relation.TgtEntityID
-			if !m.rnibClient.HasMHORANFunction(ctx, e2NodeID, oid) {
-				log.Debugf("Received topo event does not have MHO RAN function - %v", topoEvent)
+
+			if !m.rnibClient.HasRcRANFunction(ctx, e2NodeID, oid) {
+				log.Debugf("Received topo event does not have RC RAN function for MHO - %v", topoEvent)
 				continue
 			}
-			m.CtrlReqChs[string(e2NodeID)] = make(chan *e2api.ControlMessage)
-			triggers := make(map[e2sm_mho.MhoTriggerType]bool)
-			triggers[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC] = m.appConfig.GetPeriodic()
-			triggers[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT] = m.appConfig.GetUponRcvMeas()
-			triggers[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_CHANGE_RRC_STATUS] = m.appConfig.GetUponChangeRrcStatus()
-			for triggerType, enabled := range triggers {
-				if enabled {
-					go func(triggerType e2sm_mho.MhoTriggerType) {
-						log.Infof("tx subscription, e2NodeID:%v, triggerType:%v", e2NodeID, e2sm_mho.MhoTriggerType_name[int32(triggerType)])
-						err := m.createSubscription(ctx, e2NodeID, triggerType)
-						if err != nil {
-							log.Warn(err)
-						}
-					}(triggerType)
+
+			go func() {
+				log.Debugf("start creating subscription %v", topoEvent)
+				err := m.newSubscription(ctx, e2NodeID)
+				if err != nil {
+					log.Warn(err)
 				}
-			}
+			}()
+
 			go m.watchMHOChanges(ctx, e2NodeID)
 		} else if topoEvent.Type == topoapi.EventType_REMOVED {
 			// TODO - Handle E2 node disconnect
 			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)
 			e2NodeID := relation.Relation.TgtEntityID
-			if !m.rnibClient.HasMHORANFunction(ctx, e2NodeID, oid) {
-				log.Debugf("Received topo event does not have MHO RAN function - %v", topoEvent)
+			if !m.rnibClient.HasRcRANFunction(ctx, e2NodeID, oid) {
+				log.Debugf("Received topo event does not have RC RAN function for MHO - %v", topoEvent)
 				continue
 			}
 			cellIDs, err := m.rnibClient.GetCells(ctx, e2NodeID)
@@ -255,70 +253,59 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 			}
 		}
 	}
-
 	return nil
 }
 
 func (m *Manager) watchMHOChanges(ctx context.Context, e2nodeID topoapi.ID) {
+	ch := make(chan store.Event)
+	err := m.metricStore.Watch(ctx, ch)
+	if err != nil {
+		log.Error(err)
+		return
+	}
 
-	for ctrlReqMsg := range m.CtrlReqChs[string(e2nodeID)] {
-		go func(ctrlReqMsg *e2api.ControlMessage) {
-			node := m.e2client.Node(e2client.NodeID(e2nodeID))
-			ctrlRespMsg, err := node.Control(ctx, ctrlReqMsg)
+	for e := range ch {
+		if e.Type == store.Updated {
+			key := e.Key.(string)
+			v, err := m.metricStore.Get(ctx, key)
 			if err != nil {
-				//TODO - Ignore, MHO does not implement control response message
-				//log.Warnf("Error sending control message - %v", err)
-			} else if ctrlRespMsg == nil {
-				//TODO - Ignore, MHO does not implement control response message
-				log.Debugf("Control response message is nil")
+				log.Error(err)
 			}
-		}(ctrlReqMsg)
-	}
-}
+			nv := v.Value.(*store.MetricValue)
+			if e.EventMHOState.(store.MHOState) == store.Approved && nv.E2NodeID == e2nodeID {
+				rawUEID := nv.RawUEID
+				tgtCellID := nv.TgtCellID
+				header, err := control.CreateRcControlHeader(rawUEID)
+				if err != nil {
+					log.Error(err)
+				}
+				log.Debugf("send control message for key: %v, value: %v", key, nv)
+				payload, err := control.CreateRcControlMessage(tgtCellID)
+				if err != nil {
+					log.Error(err)
+				}
 
-func (m *Manager) createEventTrigger(triggerType e2sm_mho.MhoTriggerType) ([]byte, error) {
-	var reportPeriodMs int32
-	reportingPeriod, err := m.appConfig.GetReportingPeriod()
-	if err != nil {
-		return []byte{}, err
-	}
-	if triggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC {
-		reportPeriodMs = int32(reportingPeriod)
-	} else {
-		reportPeriodMs = 0
-	}
-	e2smRcEventTriggerDefinition, err := pdubuilder.CreateE2SmMhoEventTriggerDefinition(triggerType)
-	if err != nil {
-		return []byte{}, err
-	}
-	e2smRcEventTriggerDefinition.GetEventDefinitionFormats().GetEventDefinitionFormat1().SetReportingPeriodInMs(reportPeriodMs)
+				node := m.e2client.Node(e2client.NodeID(e2nodeID))
+				outcome, err := node.Control(ctx, &e2api.ControlMessage{
+					Header:  header,
+					Payload: payload,
+				}, nv.CallProcessID)
 
-	err = e2smRcEventTriggerDefinition.Validate()
-	if err != nil {
-		return []byte{}, err
+				if err != nil {
+					log.Warn(err)
+				}
+
+				log.Debugf("Outcome: %v", outcome)
+
+				log.Debugf("State changed for %v from %v to %v", key, nv.State.String(), store.Done)
+				nv.State = store.Done
+				_, err = m.metricStore.Put(ctx, key, nv, store.Done)
+				if err != nil {
+					log.Error(err)
+				}
+			}
+		}
 	}
-
-	protoBytes, err := proto.Marshal(e2smRcEventTriggerDefinition)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return protoBytes, err
-}
-
-func (m *Manager) createSubscriptionActions() []e2api.Action {
-	actions := make([]e2api.Action, 0)
-	action := &e2api.Action{
-		ID:   int32(0),
-		Type: e2api.ActionType_ACTION_TYPE_REPORT,
-		SubsequentAction: &e2api.SubsequentAction{
-			Type:       e2api.SubsequentActionType_SUBSEQUENT_ACTION_TYPE_CONTINUE,
-			TimeToWait: e2api.TimeToWait_TIME_TO_WAIT_ZERO,
-		},
-	}
-	actions = append(actions, *action)
-	return actions
-
 }
 
 // Stop stops the subscription manager
