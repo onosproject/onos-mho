@@ -17,11 +17,10 @@ func GetRanParameterValue(item *e2smrcies.RanparameterValueType, ranParamID int6
 	for _, i := range item.GetRanPChoiceStructure().GetRanParameterStructure().GetSequenceOfRanParameters() {
 		if i.RanParameterId.Value == ranParamID {
 			return i.GetRanParameterValueType().GetRanPChoiceElementFalse().GetRanParameterValue(), nil
-		} else {
-			v, err := GetRanParameterValue(i.GetRanParameterValueType(), ranParamID)
-			if err == nil {
-				return v, nil
-			}
+		}
+		v, err := GetRanParameterValue(i.GetRanParameterValueType(), ranParamID)
+		if err == nil {
+			return v, nil
 		}
 	}
 

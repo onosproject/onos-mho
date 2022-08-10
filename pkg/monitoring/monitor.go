@@ -95,7 +95,7 @@ func (m *Monitor) processInsertIndicationHeader2Message5(ctx context.Context, in
 		//		tgtCellID = v.GetValuePrintableString()
 		//	}
 		//}
-		log.Debugf("Received UEID: %v", *ueID)
+		log.Debugf("Received UEID: %v", ueID)
 		log.Debugf("Received TargetCellID: %v", tgtCellID)
 		log.Debugf("Received CallProcessID: %v", callProcessID)
 		log.Debugf("Received Store Key: %v", key)

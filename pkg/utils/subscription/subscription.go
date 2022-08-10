@@ -9,12 +9,9 @@ import (
 	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_rc/pdubuilder"
 	e2smcommonies "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_rc/v1/e2sm-common-ies"
 	e2smrcies "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_rc/v1/e2sm-rc-ies"
-	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-mho/pkg/definition"
 	"google.golang.org/protobuf/proto"
 )
-
-var log = logging.GetLogger()
 
 func CreateEventTriggerDefinition() ([]byte, error) {
 	eventTriggerUeEventIDItem, err := pdubuilder.CreateEventTriggerUeeventInfoItem(definition.AssociatedUeEventID)
