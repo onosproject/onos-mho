@@ -139,7 +139,7 @@ func (m *Manager) getRanFunction(serviceModelsInfo map[string]*topoapi.ServiceMo
 }
 
 func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID) error {
-	log.Infof("Creating subscription for E2 node with ID: ", e2nodeID)
+	log.Infof("Creating subscription for E2 node with ID: %v", e2nodeID)
 
 	eventTriggerData, err := subscription.CreateEventTriggerDefinition()
 	if err != nil {
