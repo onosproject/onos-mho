@@ -61,12 +61,15 @@ func (s *Server) GetUes(ctx context.Context, request *mhoapi.GetRequest) (*mhoap
 			tmpUe := &mhoapi.UE{
 				UeId:    fmt.Sprintf("%d", v.RawUEID.GetGNbUeid().GetAmfUeNgapId().GetValue()),
 				HoState: v.State.String(),
-				Cgi:     string(v.TgtCellID),
+				Cgi:     v.TgtCellID,
 			}
 			ues = append(ues, tmpUe)
 		}
 	}()
-	s.metricStore.Entries(ctx, ch)
+	err := s.metricStore.Entries(ctx, ch)
+	if err != nil {
+		return nil, err
+	}
 
 	wg.Wait()
 	return &mhoapi.UeList{
@@ -79,7 +82,7 @@ func (s *Server) GetCells(ctx context.Context, request *mhoapi.GetRequest) (*mho
 	var wg sync.WaitGroup
 	wg.Add(1)
 	cells := make([]*mhoapi.Cell, 0)
-	result := make(map[string]int, 0)
+	result := make(map[string]int)
 	go func() {
 		defer wg.Done()
 		for e := range ch {
@@ -91,7 +94,10 @@ func (s *Server) GetCells(ctx context.Context, request *mhoapi.GetRequest) (*mho
 			result[v.TgtCellID]++
 		}
 	}()
-	s.metricStore.Entries(ctx, ch)
+	err := s.metricStore.Entries(ctx, ch)
+	if err != nil {
+		return nil, err
+	}
 
 	wg.Wait()
 
