@@ -7,6 +7,8 @@ package northbound
 
 import (
 	"context"
+	"fmt"
+	"sync"
 
 	mhoapi "github.com/onosproject/onos-api/go/onos/mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
@@ -44,21 +46,70 @@ type Server struct {
 }
 
 func (s *Server) GetUes(ctx context.Context, request *mhoapi.GetRequest) (*mhoapi.UeList, error) {
-	//TODO implement me
-	log.Error("Not implemented yet")
-	return nil, nil
+	ch := make(chan *store.Entry)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	ues := make([]*mhoapi.UE, 0)
+	go func() {
+		defer wg.Done()
+		for e := range ch {
+			v := e.Value.(*store.MetricValue)
+			if v.RawUEID.GetGNbUeid() == nil {
+				log.Errorf("Currently gNB UE ID supported only: received UE ID: %v", v.RawUEID)
+				continue
+			}
+			tmpUe := &mhoapi.UE{
+				UeId:    fmt.Sprintf("%d", v.RawUEID.GetGNbUeid().GetAmfUeNgapId().GetValue()),
+				HoState: v.State.String(),
+				Cgi:     v.TgtCellID,
+			}
+			ues = append(ues, tmpUe)
+		}
+	}()
+	err := s.metricStore.Entries(ctx, ch)
+	if err != nil {
+		return nil, err
+	}
+
+	wg.Wait()
+	return &mhoapi.UeList{
+		Ues: ues,
+	}, nil
 }
 
 func (s *Server) GetCells(ctx context.Context, request *mhoapi.GetRequest) (*mhoapi.CellList, error) {
-	//TODO implement me
-	log.Error("Not implemented yet")
-	return nil, nil
-}
+	ch := make(chan *store.Entry)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	cells := make([]*mhoapi.Cell, 0)
+	result := make(map[string]int)
+	go func() {
+		defer wg.Done()
+		for e := range ch {
+			v := e.Value.(*store.MetricValue)
+			if v.RawUEID.GetGNbUeid() == nil {
+				log.Errorf("Currently gNB UE ID supported only: received UE ID: %v", v.RawUEID)
+				continue
+			}
+			result[v.TgtCellID]++
+		}
+	}()
+	err := s.metricStore.Entries(ctx, ch)
+	if err != nil {
+		return nil, err
+	}
 
-func (s *Server) GetMhoParams(ctx context.Context, request *mhoapi.GetMhoParamRequest) (*mhoapi.GetMhoParamResponse, error) {
-	return nil, nil
-}
+	wg.Wait()
 
-func (s *Server) SetMhoParams(ctx context.Context, request *mhoapi.SetMhoParamRequest) (*mhoapi.SetMhoParamResponse, error) {
-	return nil, nil
+	for k, v := range result {
+		tmpCell := &mhoapi.Cell{
+			Cgi:    k,
+			NumUes: int64(v),
+		}
+
+		cells = append(cells, tmpCell)
+	}
+	return &mhoapi.CellList{
+		Cells: cells,
+	}, nil
 }
