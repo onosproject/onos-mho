@@ -7,53 +7,66 @@ package subscription
 import (
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_rc/pdubuilder"
-	e2smcommonies "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_rc/v1/e2sm-common-ies"
-	e2smrcies "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_rc/v1/e2sm-rc-ies"
 	"github.com/onosproject/onos-mho/pkg/definition"
 	"google.golang.org/protobuf/proto"
 )
 
 func CreateEventTriggerDefinition() ([]byte, error) {
-	eventTriggerUeEventIDItem, err := pdubuilder.CreateEventTriggerUeeventInfoItem(definition.AssociatedUeEventID)
+	//eventTriggerUeEventIDItem, err := pdubuilder.CreateEventTriggerUeeventInfoItem(definition.AssociatedUeEventID)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//eventTriggerUeEventInfo := &e2smrcies.EventTriggerUeeventInfo{
+	//	UeEventList: []*e2smrcies.EventTriggerUeeventInfoItem{eventTriggerUeEventIDItem},
+	//}
+	//
+	//eventTriggerItem, err := pdubuilder.CreateE2SmRcEventTriggerFormat1Item(definition.E2EventTriggerConditionID, &e2smrcies.MessageTypeChoice{
+	//	MessageTypeChoice: &e2smrcies.MessageTypeChoice_MessageTypeChoiceRrc{
+	//		MessageTypeChoiceRrc: &e2smrcies.MessageTypeChoiceRrc{
+	//			RRcMessage: &e2smcommonies.RrcMessageId{
+	//				RrcType: &e2smcommonies.RrcType{
+	//					RrcType: &e2smcommonies.RrcType_Nr{
+	//						Nr: e2smcommonies.RrcclassNr_RRCCLASS_NR_U_L_DCCH,
+	//					},
+	//				},
+	//				MessageId: definition.RrcMessageIDNrUlDcchMeasurementReport,
+	//			},
+	//		},
+	//	},
+	//}, nil, nil, eventTriggerUeEventInfo, nil)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//itemList := []*e2smrcies.E2SmRcEventTriggerFormat1Item{eventTriggerItem}
+	//
+	//rcEventTriggerDefinitionFormat3, err := pdubuilder.CreateE2SmRcEventTriggerFormat1(itemList)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//err = rcEventTriggerDefinitionFormat3.Validate()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//protoBytes, err := proto.Marshal(rcEventTriggerDefinitionFormat3)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	eventTrigger, err := pdubuilder.CreateE2SmRcEventTriggerFormat2(definition.CallProcessTypeIDMobilityManagement, definition.CallBreakpointIDHandoverPreparation)
 	if err != nil {
 		return nil, err
 	}
 
-	eventTriggerUeEventInfo := &e2smrcies.EventTriggerUeeventInfo{
-		UeEventList: []*e2smrcies.EventTriggerUeeventInfoItem{eventTriggerUeEventIDItem},
-	}
-
-	eventTriggerItem, err := pdubuilder.CreateE2SmRcEventTriggerFormat1Item(definition.E2EventTriggerConditionID, &e2smrcies.MessageTypeChoice{
-		MessageTypeChoice: &e2smrcies.MessageTypeChoice_MessageTypeChoiceRrc{
-			MessageTypeChoiceRrc: &e2smrcies.MessageTypeChoiceRrc{
-				RRcMessage: &e2smcommonies.RrcMessageId{
-					RrcType: &e2smcommonies.RrcType{
-						RrcType: &e2smcommonies.RrcType_Nr{
-							Nr: e2smcommonies.RrcclassNr_RRCCLASS_NR_U_L_DCCH,
-						},
-					},
-					MessageId: definition.RrcMessageIDNrUlDcchMeasurementReport,
-				},
-			},
-		},
-	}, nil, nil, eventTriggerUeEventInfo, nil)
+	err = eventTrigger.Validate()
 	if err != nil {
 		return nil, err
 	}
 
-	itemList := []*e2smrcies.E2SmRcEventTriggerFormat1Item{eventTriggerItem}
-
-	rcEventTriggerDefinitionFormat3, err := pdubuilder.CreateE2SmRcEventTriggerFormat1(itemList)
-	if err != nil {
-		return nil, err
-	}
-
-	err = rcEventTriggerDefinitionFormat3.Validate()
-	if err != nil {
-		return nil, err
-	}
-
-	protoBytes, err := proto.Marshal(rcEventTriggerDefinitionFormat3)
+	protoBytes, err := proto.Marshal(eventTrigger)
 	if err != nil {
 		return nil, err
 	}
