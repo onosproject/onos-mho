@@ -27,4 +27,6 @@ const (
 	RicInsertIndicationID                 = 1 // handover control request
 	RicActionID                           = 3
 	ControlActionID                       = 1
+	CallProcessTypeIDMobilityManagement   = 3
+	CallBreakpointIDHandoverPreparation   = 1
 )
