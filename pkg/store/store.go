@@ -55,7 +55,7 @@ func NewStore() Store {
 	}
 }
 
-func (s *store) Entries(ctx context.Context, ch chan<- *Entry) error {
+func (s *store) Entries(_ context.Context, ch chan<- *Entry) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -67,7 +67,7 @@ func (s *store) Entries(ctx context.Context, ch chan<- *Entry) error {
 	return nil
 }
 
-func (s *store) Delete(ctx context.Context, key string) error {
+func (s *store) Delete(_ context.Context, key string) error {
 	// TODO check the key and make sure it is not empty
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -76,7 +76,7 @@ func (s *store) Delete(ctx context.Context, key string) error {
 
 }
 
-func (s *store) Put(ctx context.Context, key string, value interface{}, state MHOState) (*Entry, error) {
+func (s *store) Put(_ context.Context, key string, value interface{}, state MHOState) (*Entry, error) {
 	log.Debugf("Put store entry: key: %v, value: %v", key, value)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -104,7 +104,7 @@ func (s *store) Put(ctx context.Context, key string, value interface{}, state MH
 	return entry, nil
 }
 
-func (s *store) Get(ctx context.Context, key string) (*Entry, error) {
+func (s *store) Get(_ context.Context, key string) (*Entry, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if v, ok := s.records[key]; ok {
@@ -113,7 +113,7 @@ func (s *store) Get(ctx context.Context, key string) (*Entry, error) {
 	return nil, errors.New(errors.NotFound, "the entry does not exist")
 }
 
-func (s *store) HasEntry(ctx context.Context, key string) bool {
+func (s *store) HasEntry(_ context.Context, key string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.records[key]; ok {

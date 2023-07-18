@@ -45,7 +45,7 @@ type Server struct {
 	metricStore store.Store
 }
 
-func (s *Server) GetUes(ctx context.Context, request *mhoapi.GetRequest) (*mhoapi.UeList, error) {
+func (s *Server) GetUes(ctx context.Context, _ *mhoapi.GetRequest) (*mhoapi.UeList, error) {
 	ch := make(chan *store.Entry)
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -77,7 +77,7 @@ func (s *Server) GetUes(ctx context.Context, request *mhoapi.GetRequest) (*mhoap
 	}, nil
 }
 
-func (s *Server) GetCells(ctx context.Context, request *mhoapi.GetRequest) (*mhoapi.CellList, error) {
+func (s *Server) GetCells(ctx context.Context, _ *mhoapi.GetRequest) (*mhoapi.CellList, error) {
 	ch := make(chan *store.Entry)
 	var wg sync.WaitGroup
 	wg.Add(1)
