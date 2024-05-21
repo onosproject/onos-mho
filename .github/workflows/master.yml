@@ -68,6 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: FOSSA scan
         uses: fossa-contrib/fossa-action@v3
         with:
