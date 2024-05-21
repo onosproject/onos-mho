@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - master
+      - GHA-integration
   pull_request:
 
 jobs:
@@ -26,7 +27,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
-      - uses: golangci/golangci-lint-action@v3.7.0
+      - uses: golangci/golangci-lint-action@v6
         with:
           version: latest
           args: -v --config ./.golangci.yml
@@ -62,14 +63,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: reuse lint
-        uses: fsfe/reuse-action@v2
+        uses: fsfe/reuse-action@v3
 
   fossa-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
- 
       - name: FOSSA scan
-        uses: fossas/fossa-action@main
+        uses: fossa-contrib/fossa-action@v3
         with:
-          api-key: ${{secrets.fossaApiKey}}
+          fossa-api-key: 6d304c09a3ec097ba4517724e4a4d17d
