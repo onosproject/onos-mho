@@ -12,3 +12,4 @@ build/build-tools
 .idea/
 
 vendor
+venv

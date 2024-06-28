@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2019-present Open Networking Foundation <info@opennetworking.org>
-#
 # SPDX-License-Identifier: Apache-2.0
+# Copyright 2019 Open Networking Foundation
+# Copyright 2024 Intel Corporation
 
 export CGO_ENABLED=1
 export GO111MODULE=on
@@ -11,69 +11,56 @@ ONOS_MHO_VERSION := latest
 ONOS_PROTOC_VERSION := v0.6.6
 BUF_VERSION := 0.27.1
 
+GOLANG_CI_VERSION := v1.52.2
+
+all: build images
+
 build: # @HELP build the Go binaries and run all validations (default)
-build:
 	go build -o build/_output/onos-mho ./cmd/onos-mho
 
-build-tools:=$(shell if [ ! -d "./build/build-tools" ]; then cd build && git clone https://github.com/onosproject/build-tools.git; fi)
-include ./build/build-tools/make/onf-common.mk
-
 test: # @HELP run the unit tests and source code validation
-test: build deps linters license
+test: build lint license
 	go test -race github.com/onosproject/onos-mho/pkg/...
 	go test -race github.com/onosproject/onos-mho/cmd/...
 
-jenkins-test:  # @HELP run the unit tests and source code validation producing a junit style report for Jenkins
-jenkins-test: deps license linters
-	TEST_PACKAGES=github.com/onosproject/onos-mho/... ./build/build-tools/build/jenkins/make-unit
-
-buflint: #@HELP run the "buf check lint" command on the proto files in 'api'
-	docker run -it -v `pwd`:/go/src/github.com/onosproject/onos-mho \
-		-w /go/src/github.com/onosproject/onos-mho/api \
-		bufbuild/buf:${BUF_VERSION} check lint
-
-protos: # @HELP compile the protobuf files (using protoc-go Docker)
-protos:
-	docker run -it -v `pwd`:/go/src/github.com/onosproject/onos-mho \
-		-w /go/src/github.com/onosproject/onos-mho \
-		--entrypoint build/bin/compile-protos.sh \
-		onosproject/protoc-go:${ONOS_PROTOC_VERSION}
-
-helmit-mho: integration-test-namespace # @HELP run MHO tests locally
-	helmit test -n test ./cmd/onos-mho-test --timeout 30m --no-teardown \
-			--suite mho
-
-helmit-ha: integration-test-namespace # @HELP run MHO HA tests locally
-	helmit test -n test ./cmd/onos-mho-test --timeout 30m --no-teardown \
-			--suite ha
-
-integration-tests: helmit-mho helmit-ha # @HELP run all MHO integration tests locally
-
-onos-mho-docker: # @HELP build onos-mho Docker image
-onos-mho-docker:
+docker-build-onos-mho: # @HELP build Docker image
 	@go mod vendor
 	docker build . -f build/onos-mho/Dockerfile \
 		-t onosproject/onos-mho:${ONOS_MHO_VERSION}
 	@rm -rf vendor
 
-images: # @HELP build all Docker images
-images: build onos-mho-docker
+docker-build: # @HELP build all Docker images
+docker-build: build docker-build-onos-mho
 
-kind: # @HELP build Docker images and add them to the currently configured kind cluster
-kind: images
-	@if [ "`kind get clusters`" = '' ]; then echo "no kind cluster found" && exit 1; fi
-	kind load docker-image onosproject/onos-mho:${ONOS_MHO_VERSION}
+docker-push-onos-mho: # @HELP push Docker image
+	docker push onosproject/onos-mho:${ONOS_PCI_VERSION}
 
-all: build images
+docker-push: # @HELP push docker images
+docker-push: docker-push-onos-mho
 
-publish: # @HELP publish version on github and dockerhub
-	./build/build-tools/publish-version ${VERSION} onosproject/onos-mho
+lint: # @HELP examines Go source code and reports coding problems
+	golangci-lint --version | grep $(GOLANG_CI_VERSION) || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b `go env GOPATH`/bin $(GOLANG_CI_VERSION)
+	golangci-lint run --timeout 15m
 
-jenkins-publish: jenkins-tools # @HELP Jenkins calls this to publish artifacts
-	./build/bin/push-images
-	./build/build-tools/release-merge-commit
+license: # @HELP run license checks
+	rm -rf venv
+	python3 -m venv venv
+	. ./venv/bin/activate;\
+	python3 -m pip install --upgrade pip;\
+	python3 -m pip install reuse;\
+	reuse lint
 
-clean:: # @HELP remove all the build artifacts
-	rm -rf ./build/_output ./vendor ./cmd/onos-mho/onos-mho ./cmd/onos/onos
-	go clean -testcache github.com/onosproject/onos-mho/...
+check-version: # @HELP check version is duplicated
+	./build/bin/version_check.sh all
 
+clean: # @HELP remove all the build artifacts
+	rm -rf ./build/_output ./vendor ./cmd/onos-mho/onos-mho ./cmd/onos/onos venv
+	go clean github.com/onosproject/onos-mho/...
+
+help:
+	@grep -E '^.*: *# *@HELP' $(MAKEFILE_LIST) \
+    | sort \
+    | awk ' \
+        BEGIN {FS = ": *# *@HELP"}; \
+        {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}; \
+    '
