@@ -33,7 +33,7 @@ docker-build: # @HELP build all Docker images
 docker-build: build docker-build-onos-mho
 
 docker-push-onos-mho: # @HELP push Docker image
-	docker push onosproject/onos-mho:${ONOS_PCI_VERSION}
+	docker push onosproject/onos-mho:${ONOS_MHO_VERSION}
 
 docker-push: # @HELP push docker images
 docker-push: docker-push-onos-mho
