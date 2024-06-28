@@ -7,7 +7,7 @@ export GO111MODULE=on
 
 .PHONY: build
 
-ONOS_MHO_VERSION := latest
+ONOS_MHO_VERSION ?= latest
 ONOS_PROTOC_VERSION := v0.6.6
 BUF_VERSION := 0.27.1
 
